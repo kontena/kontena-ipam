@@ -1,0 +1,8 @@
+plugin:
+  build: .
+  net: host
+  volumes:
+    - /run/docker/plugins/:/run/docker/plugins/
+etcd:
+  image: kontena/etcd:2.3.3
+  net: host

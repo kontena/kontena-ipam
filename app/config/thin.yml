@@ -1,0 +1,3 @@
+daemonize: false
+socket: /run/docker/plugins/kontena-ipam.sock
+log: /dev/stdout
