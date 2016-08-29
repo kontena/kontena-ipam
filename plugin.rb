@@ -1,7 +1,14 @@
 require_relative 'app/boot'
 
 class IpamPlugin < Sinatra::Application
+  include Logging
   set :logging, true
+  set :show_exceptions, false
+
+  def self.ensure_keys
+    $etcd.set('/kontena/ipam/pools/', dir: true) rescue nil
+    $etcd.set('/kontena/ipam/addresses/', dir: true) rescue nil
+  end
 
   post '/Plugin.Activate' do
     $etcd.set('/kontena/ipam/pools/', dir: true) rescue nil
@@ -29,6 +36,8 @@ class IpamPlugin < Sinatra::Application
     params = {}
     params[:id] = data['PoolID'] unless data['PoolID'].to_s.empty?
     params[:pool] = data['Pool'] unless data['Pool'].to_s.empty?
+    params[:opts] = data['Options'] || {}
+    params[:network] = data.dig('Options', 'network')
     outcome = AddressPools::Request.run(params)
     if outcome.success?
       JSON.dump(
@@ -60,6 +69,7 @@ class IpamPlugin < Sinatra::Application
   post '/IpamDriver.ReleaseAddress' do
     data = JSON.parse(request.body.read)
     outcome = Addresses::Release.run(
+      pool: data['PoolID'],
       address: data['Address']
     )
     if outcome.success?
@@ -72,8 +82,8 @@ class IpamPlugin < Sinatra::Application
 
   post '/IpamDriver.ReleasePool' do
     data = JSON.parse(request.body.read)
-    outcome = AddressPool::Release.run(
-      address: data['Address']
+    outcome = AddressPools::Release.run(
+      id: data['PoolID']
     )
     if outcome.success?
       '{}'
@@ -84,4 +94,3 @@ class IpamPlugin < Sinatra::Application
   end
 end
 
-#Rack::Server.start app: IpamPlugin, Host: '127.0.0.1', Port: '4567'

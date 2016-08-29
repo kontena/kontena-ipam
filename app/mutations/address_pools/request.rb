@@ -2,31 +2,37 @@ require 'ipaddr'
 
 module AddressPools
   class Request < Mutations::Command
+    include Logging
+
+    required do
+      string :network, default: 'kontena'
+    end
 
     optional do
-      string :id, default: 'kontena'
       string :pool
+      hash :opts
     end
 
     def execute
-      if self.id == 'kontena' && self.pool.to_s.empty?
+      info "requesting pool with pool: #{self.pool}, network: #{self.network}"
+      if self.network == 'kontena'
         self.pool = '10.81.0.0/16'
       end
-      item = etcd.get("/kontena/ipam/pools/#{self.id}") rescue nil
+      item = etcd.get("/kontena/ipam/pools/#{self.network}") rescue nil
       if item
-        address_pool = AddressPool.new(self.id, item.value)
+        address_pool = AddressPool.new(self.network, item.value)
       else
-        reserved_pool = reserve_pool(self.id, self.pool.to_s)
+        reserved_pool = reserve_pool(self.network, self.pool.to_s)
         add_error(:error, :duplicate, 'Pool address already in use') if reserved_pool.nil?
-        address_pool = AddressPool.new(self.id, reserved_pool)
+        address_pool = AddressPool.new(self.network, reserved_pool)
       end
-
       address_pool
     end
 
     # @param [String] id
     # @param [String] pool
     def reserve_pool(id, pool)
+      info "reserve pool, id: #{id}, pool: #{pool}"
       if pool.empty?
         generate_default_pool(id)
       else

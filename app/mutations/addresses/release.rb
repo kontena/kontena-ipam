@@ -2,18 +2,21 @@ require 'ipaddr'
 
 module Addresses
   class Release < Mutations::Command
+    include Logging
 
     required do
       string :address
+      string :pool
     end
 
     def validate
-      resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
+      resp = etcd.get("/kontena/ipam/pools/#{self.pool}") rescue nil
       add_error(:error, :not_found, 'Pool not found') if resp.nil?
     end
 
     def execute
-      etcd.delete("/kontena/ipam/addresses/#{self.pool_id}/#{address}")
+      info "releasing address: #{self.address} in pool: #{self.pool}"
+      etcd.delete("/kontena/ipam/addresses/#{self.pool}/#{self.address}")
     end
 
     # @return [Etcd::Client]
