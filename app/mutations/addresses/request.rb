@@ -2,6 +2,7 @@ require 'ipaddr'
 
 module Addresses
   class Request < Mutations::Command
+    include Logging
 
     required do
       string :pool_id, default: 'kontena'
@@ -16,7 +17,8 @@ module Addresses
 
     def execute
       addresses = available_addresses
-      puts "available (#{self.pool_id}): #{addresses.size}"
+      info "requesting address in pool: #{@pool}"
+      info "available (#{self.pool_id}): #{addresses.size}"
       if addresses.size > 100
         ip = addresses[rand(0..100)]
       else
@@ -28,7 +30,7 @@ module Addresses
         add_error(:error, :cannot_allocate, 'Cannot allocate ip, address pool is full')
       end
 
-      ip
+      "#{ip}/#{@pool.split('/')[1]}"
     end
 
     # @return [Array<IPAddr>]

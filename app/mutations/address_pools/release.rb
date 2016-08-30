@@ -1,15 +1,17 @@
 require 'ipaddr'
 
 module AddressPools
-  class Request < Mutations::Command
+  class Release < Mutations::Command
+    include Logging
 
-    optional do
+    required do
       string :id
     end
 
     def execute
-      etcd.delete("/kontena/ipam/pools/#{self.id}", recursive: true)
-      etcd.delete("/kontena/ipam/addresses/#{self.id}", recursive: true)
+      info "AddressPools::Relase: #{self.inputs}"
+      etcd.delete("/kontena/ipam/pools/#{self.id}", recursive: true) rescue nil
+      etcd.delete("/kontena/ipam/addresses/#{self.id}", recursive: true) rescue nil
     end
 
     # @return [Etcd::Client]
