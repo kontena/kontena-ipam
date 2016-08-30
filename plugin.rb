@@ -36,7 +36,6 @@ class IpamPlugin < Sinatra::Application
     params = {}
     params[:id] = data['PoolID'] unless data['PoolID'].to_s.empty?
     params[:pool] = data['Pool'] unless data['Pool'].to_s.empty?
-    params[:opts] = data['Options'] || {}
     params[:network] = data.dig('Options', 'network')
     outcome = AddressPools::Request.run(params)
     if outcome.success?

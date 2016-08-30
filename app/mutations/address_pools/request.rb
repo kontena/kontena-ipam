@@ -10,7 +10,6 @@ module AddressPools
 
     optional do
       string :pool
-      hash :opts
     end
 
     def execute
