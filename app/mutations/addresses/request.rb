@@ -41,7 +41,12 @@ module Addresses
     # @return [Array<IPAddr>]
     def address_pool
       unless self.class.pools[@pool]
-        self.class.pools[@pool] = IPAddr.new(@pool).to_range.to_a[1..-1].map{|ip| ip.to_s }
+        if self.pool_id == 'kontena'
+          # In the default kontena network, skip first 255 addresses for weave expose
+          self.class.pools[@pool] = IPAddr.new(@pool).to_range.to_a[256..-1].map{|ip| ip.to_s }
+        else
+          self.class.pools[@pool] = IPAddr.new(@pool).to_range.to_a[1..-1].map{|ip| ip.to_s }
+        end
       end
       self.class.pools[@pool]
     end
