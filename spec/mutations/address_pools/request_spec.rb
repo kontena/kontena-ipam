@@ -104,9 +104,11 @@ describe AddressPools::Request do
 
     it 'fails to reserve given pool when overlaps with existing pools' do
       reserved_pools = [IPAddr.new('10.82.0.0/16'), IPAddr.new('10.84.0.0/16')]
-      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
+      expect(subject).to receive(:reserved_pools).twice.and_return(reserved_pools)
+      expect(etcd).not_to receive(:set)
 
       subject.reserve_requested_pool('test', '10.82.0.0/17')
+      subject.reserve_requested_pool('test', '10.80.0.0/14')
     end
   end
 end
