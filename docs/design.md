@@ -101,7 +101,7 @@ The address in `10.81.X.Y` format. Must match the address in the key.
 # Alternatives
 
 ## Docker Swarm Mode
-Docker Swarm Mode uses its own internal cluster store, and does not support external network drivers.
+Docker Swarm Mode uses its own internal cluster store, and [does not support external network drivers](https://docs.docker.com/engine/extend/plugins_network/#/network-driver-plugins-and-swarm-mode).
 If you are using Docker Swarm Mode, use the Docker default IPAM with the overlay network driver.
 
 ## Docker Cluster Store

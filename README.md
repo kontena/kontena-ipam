@@ -1,4 +1,4 @@
-# Kontena Ipam
+# Kontena IPAM
 
 A Docker/libnetwork IPAM driver plugin, using etcd for cluster storage.
 
