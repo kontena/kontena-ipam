@@ -38,36 +38,65 @@ The address in `10.81.X.Y` format. Must match the address in the key.
 
 * Register as a local scope driver
   * Uses etcd to share the IPAM configuration across Docker nodes
+  * MUST support deferred etcd operations to delay any IPAM requests until the etcd cluster is available
+  * The etcd cluster may not necessarily be immediately available on IPAM startup!
 * Pool
-  * Support `RequestPool` with an empy Pool to automatically allocate new subnets
+  * Support automatic `RequestPool` allocation
     * Support a `--supernet` option giving a CIDR netmask
     * New subnets are allocated within the `--supernet`
-    * Using some policy to determine the size of the allocated address pool size, based on the size of the `--supernet`
- * Support `RequestPool` with an explicit pool
-   * The explicit pool may be outside of the `--supernet`
-   * Allow the same Docker network to be created on multiple Docker nodes
-     * On the first node where the Docker network is created, the it should allocate a subnet and create a new etcd pool key.
-     * On the other nodes where the same Docker network is created, it should return the subnet for the existing etcd pool key.
-     * TODO: how is the Docker network identified?
-       * The IPAM does not know the name of the Docker network.
-       * Require a `docker network create --ipam-opt network=...` option?
+    * Use some policy to determine the size of the allocated address pool size, based on the size of the `--supernet`
+  * Support manual `RequestPool` allocation with an explicit pool
+    * The explicit pool MAY be outside of the `--supernet`
+  * #16 The same Docker network MAY be created on multiple Docker nodes
+    * On the first node where the Docker network is created, the it should allocate a subnet and create a new etcd pool key.
+    * On the other nodes where the same Docker network is created, it should return the subnet for the existing etcd pool key.
+    * TODO: how is the Docker network identified?
+      * Extend the IPAM driver API using a `docker network create --ipam-opt network=...` option?
+    * Different nodes MUST use the same `--ip-range` etc configuration.
+  * Correctly handle IPv4 vs IPv6 subnets
+    * #10 Return an "IPv6 is unsupported" error
+    * Weave does not support IPv6 anyways
 * Addresses
-  * Allow the reservation of addresses within a subnet
-    * Reserved addresses are used for the statically allocated node addresses
+  * #15 Allow a subset of the subnet addresses to be reserved for static allocation
+    * Support `docker network create --ipam-driver kontena-ipam --subnet 10.81.0.0/16 --ip-range=10.81.128.0/17`
+    * Using support for `RequestAddress` `{"SubPool": ...}` #9
+    * Addresses for containers are dynamically allocated from the remainder of the subnet
     * Requried to bootstrap the node before the IPAM driver is running
     * For the default `kontena` network, these are the first `1..254` host addresses
-    * Use `docker network create --aux-address ...`?
+    * Optionally use `docker network create --aux-address ...` (#6) or `--gateway` (#13) to also reserve the static addresses?
+  * Allow dynamic allocation of addresses within a pool
+    * #11 Do not rely on `ReleaseAddress` to clean out unused address from the pool
+      * The Docker IPAM `ReleaseAddress` operations is not reliable
+      * Particularly in the case of the IPAM driver running as a Docker container (#14)
+      * A node being restarted and requesting new addresses for containers should not pollute the address pool with stale addresses
+      * Without automatic address cleanup, the pool may eventually fill up, given enough node churn
+    * Allocated addresses must owned by a Node
+      * TODO: how are the node's addresses identified?
+      * Store the `/kontena/ipam/addresses/$pool/$address {"Host": "..."}` node with the Host identifier?
+  * Allow allocation of specific addresses
+    * The addresses may be outside of the `SubPool` range reserved for dynamic allocations
+    * This is used for:
+      * #13 `--gateway` address allocations
+      * #6 `--aux-address` allocations
+      * Migration of existing containers with `io.kontena.container.overlay_cidr` addresses assigned by the Kontena Master
+      * Potential future usage, such as virtual service addresses
+  * Do not allow duplicate allocation of addresses
+    * #4 Use etcd's consistency primitives
 * Nodes
-  * Retain allocated addresses across node failures
-    * Do not automatically release any addresses allocated by node Containers
-    * Expect that the node may return, and it will still have those addresses in use
-  * Cleanup addresses allocated by a node that has been explciitly removed
+  * #11 Handle node partitions, restarts and crashes
+    * Retain allocated addresses across temporary node partitions
+      * Expect that the node may return, and it will still have those addresses in use
+      * Avoid conflicts where the addresses were released and re-allocated elsewhere during the partition
+      * Rules out the use of TTL expiry
+    * A restarting node should attempt to release any addresses
+      * Unless retaining them for reallocation?
+    * A crashed node must be able to automatically cleanup any previously allocated addresses upon recovery
+      * This means that address cleanup must not rely only on `ReleaseAddress` operations
+  * #11 Cleanup addresses allocated by a node that has been explicitly removed
     * `kontena node remove ...`
-  * TODO: how are the node's addresses identified?
-    * Store the `/kontena/ipam/addresses/$pool/$address {"Host": "..."}` node with the Host identifier?
-    * Trigger some kind of kontena CLI -> Server -> Agent workflow where address nodes with a matching `Host` are deleted.
-    * TODO: how does the Agent communicate these node-level operations to the IPAM driver?
-    * TODO: does the Agent read/write to etcd directly?
+    * TODO: Trigger some kind of kontena CLI -> Server -> Agent workflow where address nodes with a matching `Host` are deleted.
+      * How does the Agent communicate these node-level operations to the IPAM driver?
+      * Does the Agent read/write to etcd directly?
 
 # Alternatives
 
