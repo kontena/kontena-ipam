@@ -78,8 +78,69 @@ If you are using Docker Swarm Mode, use the Docker default IPAM with the overlay
 ## Docker Cluster Store
 
 Using Docker's global-scope IPAM or network drivers requires that the Docker Engine is configured with a cluster store (`dockerd --cluster-store=etcd://...`).
-However, this causes issues at boot, as the etcd cluster will not be available when Docker starts, and Docker will fail to restart containers using global-scope networks.
+However, this causes issues at boot if the etcd cluster is not available when Docker starts, as Docker will fail to restart containers using global-scope networks.
+This is particularly likely to happen if the etcd cluster store is running as a local Docker container.
 When restarting Docker, the etcd container may be stopped early, and Docker will be unable to clean up any container endpoints on global-scope networks.
+
+While this kind of "cluster store in a container" configuration is somewhat supported (https://github.com/docker/docker/pull/22561), there are also issues with the global-scope IPAM driver related to unclean shutdown / unreachable cluster-stores.
+
+* https://github.com/docker/docker/issues/20398
+* https://github.com/docker/docker/issues/23302
+
+In particular, this can lead to a situation where the global libnetwork datastore contains stale container endpoints, which prevent starting new containers using previously allocated names:
+
+```
+$ docker rm test-1
+test-1
+$ docker run --name test-1 --net kontena -it debian:jessie
+docker: Error response from daemon: service endpoint with name test-1 already exists.
+$ docker network inspect kontena
+[
+    {
+        "Name": "kontena",
+        "Id": "b26456ff3fc6c61dabfc0f35ea61ad52097e99202266130941bc5fa5c3fd8c89",
+        "Scope": "global",
+        "Driver": "weave",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "10.81.0.0/16",
+                    "IPRange": "10.81.128.0/17",
+                    "Gateway": "10.81.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Containers": {
+            "c3f42fed8951907e806e46569cab03704e906fc1ddab08137638c512fb7b012b": {
+                "Name": "test-2",
+                "EndpointID": "d94615e1d6cbd81b12b75b1d8048946eeb0e3131745be59701ba1437e66c1b7f",
+                "MacAddress": "",
+                "IPv4Address": "",
+                "IPv6Address": ""
+            },
+            "ep-1fdca69e3fb2948feb0e35c0c0b1fc35e21b3b5f3a33a1fa7e94e0254066b6e7": {
+                "Name": "test-1",
+                "EndpointID": "1fdca69e3fb2948feb0e35c0c0b1fc35e21b3b5f3a33a1fa7e94e0254066b6e7",
+                "MacAddress": "",
+                "IPv4Address": "10.81.128.0/16",
+                "IPv6Address": ""
+            }
+        },
+        "Options": {},
+        "Labels": {}
+    }
+]
+$ docker network rm kontena
+Error response from daemon: network kontena has active endpoints
+```
+
+Apparently, Docker is not going to fix these issues, and will instead deprecate the external `--cluster-store` support in favor of Swarm Mode: https://github.com/docker/docker/issues/20398#issuecomment-243616886
+
+>  this issue is not applicable to the overlay networking in swarm-mode since the Service Discovery doesn't use the KV-Store any more for its operation. **We will soon deprecate the --cluster-store configurations** and hence I recommend to close this issue **and recommend using swarm-mode**
 
 ## Weave IPAM
 Weave Network has an IPAM driver using its own internal cluster store. However, it includes a number of constraints:
