@@ -1,4 +1,17 @@
 module AddressPools
+  class SubnetAllocationError < StandardError
+
+  end
+  class SubnetMismatchError < SubnetAllocationError
+
+  end
+  class SubnetConflictError < SubnetAllocationError
+
+  end
+  class SubnetExhaustionError < SubnetAllocationError
+
+  end
+
   class Request < Mutations::Command
     include Logging
 
@@ -8,75 +21,83 @@ module AddressPools
     end
 
     optional do
-      string :pool
+      string :subnet, discard_empty: true
+    end
+
+    def validate
+      @subnet = IPAddr.new(subnet) if subnet_present?
+    rescue IPAddr::InvalidAddressError => e
+      add_error(:subnet, :invalid, e.message)
     end
 
     def execute
-      info "requesting pool with pool: #{self.pool}, network: #{self.network}"
-      item = etcd.get("/kontena/ipam/pools/#{self.network}") rescue nil
-      if item
-        address_pool = AddressPool.new(self.network, item.value)
+      if pool = AddressPool.get(network)
+        info "request existing network #{network} pool"
+
+        # existing network created on a remote node
+        if subnet && pool.subnet != subnet
+          raise SubnetMismatchError, "network #{network} already exists with subnet #{pool.subnet}, asked for #{subnet}"
+        end
+
+        return pool
+      elsif @subnet
+        info "request static network #{network} pool: subnet=#{@subnet}"
+
+        # statically allocated network
+        if conflict = reserved_subnets.find { |s| s if s.include?(@subnet) || @subnet.include?(s) }
+          raise SubnetConflictError, "#{subnet} conflict with #{conflict.to_cidr}"
+        end
+
+        return pool if pool = reserve_pool(@subnet)
+
+        # XXX: can we just retry and return the existing network?
+        fail "concurrent network create"
       else
-        reserved_pool = reserve_pool(self.network, self.pool.to_s)
-        add_error(:error, :duplicate, 'Pool address already in use') if reserved_pool.nil?
-        address_pool = AddressPool.new(self.network, reserved_pool)
+        info "request dynamic network #{network} pool"
+
+        # dynamically allocated network
+        policy.allocate_subnets(reserved_subnets) do |subnet|
+          return pool if pool = reserve_pool(subnet)
+
+          # XXX: can we just retry and return the existing network?
+          fail "concurrent network create"
+        end
+
+        raise SubnetExhaustionError, "supernet #{policy.supernet} is exhausted"
       end
-      address_pool
+    rescue SubnetMismatchError => e
+      add_error(:subnet, :mismatch, e.message)
+    rescue SubnetConflictError => e
+      add_error(:subnet, :conflict, e.message)
+    rescue SubnetAllocationError => e
+      add_error(:subnet, :allocate, e.message)
     end
 
-    # @param [String] id
-    # @param [String] pool
-    def reserve_pool(id, pool)
-      info "reserve pool, id: #{id}, pool: #{pool}"
-      if pool.empty?
-        generate_default_pool(id)
-      else
-        reserve_requested_pool(id, pool)
-      end
+    # Returns currently allocated subnets.
+    #
+    # This is not transactional; new subnets may appear after listing them
+    #
+    # @return [Array<IPAddr>] existing subnet allcoations
+    def reserved_subnets
+        AddressPool.list.map{|pool| pool.subnet}
     end
 
-    def generate_default_pool(pool_id)
-      reserved_pools = self.reserved_pools
-      pool = policy.allocate_subnet(reserved_pools)
+    # Reserve and return a pool using the given subnet as a new AddressPool,
+    # or return nil if a conflicting pool already exists.
+    #
+    # This conflicts on the network name, not the subnet.
+    #
+    # @return [AddressPool] or nil
+    def reserve_pool(subnet)
+      pool = AddressPool.create(network,
+        subnet: subnet,
+      )
 
-      unless pool.nil?
-        etcd.set("/kontena/ipam/pools/#{pool_id}", value: pool.to_cidr)
-        etcd.set("/kontena/ipam/addresses/#{pool_id}", dir: true)
-
-        pool.to_cidr
-      end
-    end
-
-    # @param [String] pool_id
-    # @param [String] pool
-    # @return [String] pool
-    def reserve_requested_pool(pool_id, pool)
-      ip = IPAddr.new(pool)
-      reserved_pools = self.reserved_pools
-      reserved_pool = nil
-      unless reserved_pools.any? { |p| p.include?(ip) || ip.include?(p) }
-        etcd.set("/kontena/ipam/pools/#{pool_id}", value: pool)
-        etcd.set("/kontena/ipam/addresses/#{pool_id}", dir: true)
-        reserved_pool = pool
+      if pool
+        $etcd.set("/kontena/ipam/addresses/#{pool.id}/", dir: true)
       end
 
-      reserved_pool
-    end
-
-    # @return [Array<IPAddr>]
-    def reserved_pools
-      reserved_pools = []
-      response = etcd.get("/kontena/ipam/pools/")
-      response.children.map{|c|
-        reserved_pools << IPAddr.new(c.value)
-      }
-
-      reserved_pools
-    end
-
-    # @return [Etcd::Client]
-    def etcd
-      $etcd
+      pool
     end
   end
 end

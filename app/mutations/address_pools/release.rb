@@ -5,18 +5,19 @@ module AddressPools
     include Logging
 
     required do
-      string :id
+      string :pool_id
+    end
+
+    def validate
+      unless @pool = AddressPool.get(pool_id)
+        add_error(:pool_id, :notfound, "AddressPool not found: #{pool_id}")
+      end
     end
 
     def execute
-      info "AddressPools::Relase: #{self.inputs}"
-      etcd.delete("/kontena/ipam/pools/#{self.id}", recursive: true) rescue nil
-      etcd.delete("/kontena/ipam/addresses/#{self.id}", recursive: true) rescue nil
-    end
+      @pool.delete!
 
-    # @return [Etcd::Client]
-    def etcd
-      $etcd
+      $etcd.delete("/kontena/ipam/addresses/#{@pool.id}/", recursive: true)
     end
   end
 end
