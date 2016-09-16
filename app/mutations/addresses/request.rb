@@ -13,7 +13,6 @@ module Addresses
     end
 
     def validate
-      puts "address: #{self.address}"
       resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
       add_error(:error, :not_found, 'Pool not found') if resp.nil?
       @pool = resp.value unless resp.nil?
@@ -26,11 +25,12 @@ module Addresses
 
     def execute
       addresses = available_addresses
-      info "requesting address(#{self.address}) in pool: #{self.pool_id}"
+      info "requesting address(#{self.address}) in pool: #{@pool}"
       info "available (#{self.pool_id}): #{addresses.size}"
+      info "available: #{addresses.include?(self.address)}" if self.address
       ip = nil
       if self.address
-        if addresses.include?(self.address)
+        if addresses.include?(self.address.to_s)
           ip = self.address
         else
           add_error(:error, :not_available, 'Given address already taken')
@@ -48,6 +48,7 @@ module Addresses
         etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip}", value: ip.to_s)
       else
         add_error(:error, :cannot_allocate, 'Cannot allocate ip, address pool is full')
+        return
       end
 
       "#{ip.to_s}/#{@pool.split('/')[1]}"
@@ -79,11 +80,6 @@ module Addresses
         reserved_addresses << c.value
       }
       reserved_addresses
-    end
-
-    # @return [IPAddr]
-    def addr
-      IPAddr.new("#{self.address}/#{@pool.split('/')[1]}")
     end
 
     # @return [Etcd::Client]

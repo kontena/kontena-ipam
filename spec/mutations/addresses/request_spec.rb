@@ -99,7 +99,7 @@ describe Addresses::Request do
 
     it 'returns all reserved addresses' do
       subject = described_class.new(pool_id: 'pool')
-      expected_addresses = ['10.81.1.1', '10.81.1.1']
+      expected_addresses = ['10.81.1.1', '10.81.1.2']
       expect(etcd).to receive(:get).with('/kontena/ipam/addresses/pool/')
         .and_return(double(children: [
           double({value: expected_addresses[0]}),
