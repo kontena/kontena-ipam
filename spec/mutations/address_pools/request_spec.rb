@@ -1,4 +1,3 @@
-
 describe AddressPools::Request do
 
   let(:subject) do
@@ -14,7 +13,13 @@ describe AddressPools::Request do
   end
 
   describe '#execute' do
+    let :policy do
+      spy()
+    end
+
     it 'returns address pool if it is already reserved in etcd' do
+      subject = described_class.new(policy: policy, network: 'kontena', pool: '10.81.0.0/16')
+      allow(subject).to receive(:etcd).and_return(etcd)
       expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(double({value: '10.81.0.0/16'}))
       pool = subject.execute
       expect(pool.id).to eq('kontena')
@@ -31,7 +36,7 @@ describe AddressPools::Request do
     end
 
     it 'reserves given pool' do
-      subject = described_class.new(network: 'test', pool: '10.1.2.0/16')
+      subject = described_class.new(policy: policy, network: 'test', pool: '10.1.2.0/16')
       allow(subject).to receive(:etcd).and_return(etcd)
       expect(etcd).to receive(:get).with('/kontena/ipam/pools/test').and_return(nil)
 
@@ -39,6 +44,23 @@ describe AddressPools::Request do
       pool = subject.execute
       expect(pool.id).to eq('test')
       expect(pool.pool).to eq('10.1.2.0/16')
+    end
+
+    it 'reserves new pool' do
+      subject = described_class.new(policy: policy, network: 'test')
+      allow(subject).to receive(:etcd).and_return(etcd)
+
+      expect(etcd).to receive(:get).with('/kontena/ipam/pools/test').and_return(nil)
+      expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double(children: []))
+
+      expect(policy).to receive(:allocate_subnet).with([]).and_return(IPAddr.new('10.80.0.0/24'))
+
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.80.0.0/24')
+      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
+
+      pool = subject.execute
+      expect(pool.id).to eq('test')
+      expect(pool.pool).to eq('10.80.0.0/24')
     end
 
   end
@@ -56,28 +78,48 @@ describe AddressPools::Request do
   end
 
   describe '#generate_default_pool' do
+    let :policy do
+      Policy.new(
+        'KONTENA_IPAM_SUPERNET' => '10.80.0.0/12',
+        'KONTENA_IPAM_SUBNET_LENGTH' => '24',
+      )
+    end
+
+    before do
+      allow(subject).to receive(:policy).and_return(policy)
+    end
+
     it 'reserves new pool' do
-      expect(subject).to receive(:reserved_pools).and_return([])
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.82.0.0/16')
+      reserved_pools = []
+
+      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
+      expect(policy).to receive(:allocate_subnet).with(reserved_pools).and_call_original
+
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.80.0.0/24')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
 
-      subject.generate_default_pool('test')
+      pool = subject.generate_default_pool('test')
+      expect(pool).to eq '10.80.0.0/24'
     end
 
     it 'reserves new pool after last reserved' do
-      expect(subject).to receive(:reserved_pools).and_return([IPAddr.new('10.82.0.0/16'), IPAddr.new('10.83.0.0/16')])
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.84.0.0/16')
+      reserved_pools = [IPAddr.new('10.80.0.0/16'), IPAddr.new('10.81.0.0/24')]
+
+      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
+      expect(policy).to receive(:allocate_subnet).with(reserved_pools).and_call_original
+
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.81.1.0/24')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
 
-      subject.generate_default_pool('test')
+      pool = subject.generate_default_pool('test')
+      expect(pool).to eq '10.81.1.0/24'
     end
 
     it 'returns nil if pool cannot be generated' do
-      reserved_pools = []
-      (82..254).each do |i|
-        reserved_pools << IPAddr.new("10.#{i}.0.0/16")
-      end
+      reserved_pools = (80..95).map { |i| IPAddr.new("10.#{i}.0.0/16") }
+
       expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
+      expect(policy).to receive(:allocate_subnet).with(reserved_pools).and_call_original
 
       pool = subject.generate_default_pool('test')
       expect(pool).to be_nil

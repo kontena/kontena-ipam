@@ -12,7 +12,8 @@ require_relative 'mutations/address_pools/request'
 require_relative 'mutations/address_pools/release'
 require_relative 'mutations/addresses/request'
 require_relative 'mutations/addresses/release'
-
+require_relative 'ipaddr'
+require_relative 'policy'
 
 $stdout.sync = true
 $etcd = Etcd.client(host: 'localhost', port: 2379)

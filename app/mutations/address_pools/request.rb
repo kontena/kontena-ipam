@@ -1,11 +1,10 @@
-require 'ipaddr'
-
 module AddressPools
   class Request < Mutations::Command
     include Logging
 
     required do
-      string :network, default: 'kontena'
+      model :policy
+      string :network
     end
 
     optional do
@@ -14,9 +13,6 @@ module AddressPools
 
     def execute
       info "requesting pool with pool: #{self.pool}, network: #{self.network}"
-      if self.network == 'kontena'
-        self.pool = '10.81.0.0/16'
-      end
       item = etcd.get("/kontena/ipam/pools/#{self.network}") rescue nil
       if item
         address_pool = AddressPool.new(self.network, item.value)
@@ -41,17 +37,14 @@ module AddressPools
 
     def generate_default_pool(pool_id)
       reserved_pools = self.reserved_pools
-      pool = nil
-      (82..254).each do |i|
-        next unless pool.nil?
-        ip = IPAddr.new("10.#{i}.0.0/16")
-        unless reserved_pools.any? { |p| p.include?(ip) || ip.include?(p) }
-          pool = "#{ip.to_s}/16"
-          etcd.set("/kontena/ipam/pools/#{pool_id}", value: pool)
-          etcd.set("/kontena/ipam/addresses/#{pool_id}", dir: true)
-        end
+      pool = policy.allocate_subnet(reserved_pools)
+
+      unless pool.nil?
+        etcd.set("/kontena/ipam/pools/#{pool_id}", value: pool.to_cidr)
+        etcd.set("/kontena/ipam/addresses/#{pool_id}", dir: true)
+
+        pool.to_cidr
       end
-      pool
     end
 
     # @param [String] pool_id

@@ -1,9 +1,17 @@
 require_relative 'app/boot'
+require_relative 'app/policy'
 
 class IpamPlugin < Sinatra::Application
   include Logging
   set :logging, true
   set :show_exceptions, false
+
+  def self.policy= (policy)
+    @@policy = policy
+  end
+  def policy
+    @@policy
+  end
 
   def self.ensure_keys
     $etcd.set('/kontena/ipam/pools/', dir: true) rescue nil
@@ -36,6 +44,7 @@ class IpamPlugin < Sinatra::Application
     params = {}
     params[:id] = data['PoolID'] unless data['PoolID'].to_s.empty?
     params[:pool] = data['Pool'] unless data['Pool'].to_s.empty?
+    params[:policy] = policy
     params[:network] = data.dig('Options', 'network')
     outcome = AddressPools::Request.run(params)
     if outcome.success?
