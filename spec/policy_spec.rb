@@ -26,14 +26,21 @@ describe Policy do
     end
 
     it 'allocates consecutive subnet' do
-      allocated_subnets = []
+      allocated_subnets = [
+        IPAddr.new('10.80.0.0/24'),
+      ]
+      subnets = []
 
-      subnet = policy.allocate_subnet(allocated_subnets)
-      expect(subnet).to eq IPAddr.new('10.80.0.0/24')
-      allocated_subnets << subnet
+      policy.allocate_subnets(allocated_subnets) do |subnet|
+        subnets << subnet
+        break if subnets.length >= 3
+      end
 
-      subnet = policy.allocate_subnet(allocated_subnets)
-      expect(subnet).to eq IPAddr.new('10.80.1.0/24')
+      expect(subnets).to eq [
+          IPAddr.new('10.80.1.0/24'),
+          IPAddr.new('10.80.2.0/24'),
+          IPAddr.new('10.80.3.0/24'),
+      ]
     end
 
     it 'allocates after sparse subnets' do
