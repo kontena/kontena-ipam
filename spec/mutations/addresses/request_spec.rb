@@ -23,7 +23,7 @@ describe Addresses::Request do
         .with('/kontena/ipam/pools/foo')
         .and_return(double(value: '10.81.0.0/16'))
 
-      subject = described_class.new(pool_id: 'foo', address: '10.99.100.100')
+      subject = described_class.new(pool_id: 'foo', address: IPAddr.new('10.99.100.100'))
 
       expect(subject.has_errors?).to be_truthy
     end
@@ -40,7 +40,6 @@ describe Addresses::Request do
 
     it 'validates address format if given' do
       value = double(value: '10.81.0.0/16')
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/foo').and_return(value)
       subject = described_class.new(pool_id: 'foo', address: 'fdfdfds')
       expect(subject.has_errors?).to be_truthy
     end
@@ -57,7 +56,7 @@ describe Addresses::Request do
       expect(etcd).to receive(:set)
         .with('/kontena/ipam/addresses/pool/10.81.100.100', {:value=>"10.81.100.100"})
 
-      subject = described_class.new(pool_id: 'pool', address: '10.81.100.100')
+      subject = described_class.new(pool_id: 'pool', address: IPAddr.new('10.81.100.100'))
       expect(subject).to receive(:available_addresses)
         .and_return(IPAddr.new('10.81.0.0/16').to_range.to_a)
       subject.instance_variable_set(:@pool, '10.81.0.0/16')
@@ -67,9 +66,10 @@ describe Addresses::Request do
     end
 
     it 'errors if given address not available' do
-      subject = described_class.new(pool_id: 'pool', address: '10.81.100.100')
+      ip = IPAddr.new('10.81.100.100')
+      subject = described_class.new(pool_id: 'pool', address: ip)
       available = IPAddr.new('10.81.0.0/16').to_range.to_a
-      available.delete(IPAddr.new('10.81.100.100/16'))
+      available.delete(ip)
 
       expect(subject).to receive(:available_addresses).and_return(available)
       subject.instance_variable_set(:@pool, '10.81.0.0/16')
@@ -90,7 +90,6 @@ describe Addresses::Request do
     end
 
   end
-
 
   describe '#reserved_addresses' do
 

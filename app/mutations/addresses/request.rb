@@ -9,31 +9,32 @@ module Addresses
     end
 
     optional do
-      string :address
+      model :address, class: IPAddr
     end
 
     def validate
+      puts "address: #{self.address}"
       resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
       add_error(:error, :not_found, 'Pool not found') if resp.nil?
       @pool = resp.value unless resp.nil?
       if @pool && self.address
         pool = IPAddr.new(@pool)
         add_error(:error, :address_not_within_pool,
-          "Given address not within pool") unless pool.include?(addr)
+          "Given address not within pool") unless pool.include?(self.address)
       end
-    rescue IPAddr::InvalidAddressError
-       add_error(:error, :address_not_valid, "Given address not valid")
     end
 
     def execute
       addresses = available_addresses
+      info "requesting address(#{self.address}) in pool: #{self.pool_id}"
       info "available (#{self.pool_id}): #{addresses.size}"
       ip = nil
       if self.address
-        if addresses.include?(addr)
+        if addresses.include?(self.address)
           ip = self.address
         else
           add_error(:error, :not_available, 'Given address already taken')
+          return
         end
       else
         if addresses.size > 100
@@ -44,12 +45,12 @@ module Addresses
       end
 
       if ip
-        etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip}", value: ip)
+        etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip}", value: ip.to_s)
       else
         add_error(:error, :cannot_allocate, 'Cannot allocate ip, address pool is full')
       end
 
-      "#{ip}/#{@pool.split('/')[1]}"
+      "#{ip.to_s}/#{@pool.split('/')[1]}"
     end
 
     # @return [Array<IPAddr>]
