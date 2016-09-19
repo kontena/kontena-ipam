@@ -22,3 +22,5 @@ require_relative 'mutations/addresses/release'
 
 $stdout.sync = true
 $etcd = Etcd.client(host: 'localhost', port: 2379)
+
+EtcdModel.etcd = $etcd
