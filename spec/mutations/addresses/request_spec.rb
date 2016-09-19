@@ -108,7 +108,7 @@ describe Addresses::Request do
           double({value: expected_addresses[0]}),
           double({value: expected_addresses[1]})
           ]))
-      expect(subject.reserved_addresses).to eq(expected_addresses)
+      expect(subject.reserved_addresses).to eq(expected_addresses.map {|a| IPAddr.new(a)})
     end
 
   end
@@ -148,7 +148,7 @@ describe Addresses::Request do
       subject.instance_variable_set(:@pool, IPAddr.new('10.89.0.0/24'))
 
       pool = subject.address_pool
-      expect(pool.size).to eq(255)
+      expect(pool.size).to eq(254)
       expect(subject.class.pools[IPAddr.new('10.89.0.0/24')]).to eq(pool)
     end
 
@@ -157,7 +157,7 @@ describe Addresses::Request do
       subject.instance_variable_set(:@pool, IPAddr.new('10.81.0.0/16'))
 
       pool = subject.address_pool
-      expect(pool.size).to eq(65534 - 254)
+      expect(pool.size).to eq(65534 - 255)
       expect(subject.class.pools[IPAddr.new('10.81.0.0/16')]).to eq(pool)
     end
   end

@@ -63,9 +63,9 @@ module Addresses
       unless self.class.pools[@pool]
         if self.pool_id == 'kontena'
           # In the default kontena network, skip first /24 block for weave expose
-          self.class.pools[@pool] = @pool.to_range.to_a[256..-1]
+          self.class.pools[@pool] = @pool.to_range.to_a[256...-1]
         else
-          self.class.pools[@pool] = @pool.to_range.to_a[1..-1]
+          self.class.pools[@pool] = @pool.to_range.to_a[1...-1]
         end
       end
       self.class.pools[@pool]
