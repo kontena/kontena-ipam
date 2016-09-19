@@ -3,6 +3,7 @@ if ENV['COVERAGE']
 
   SimpleCov.start do
     root './'
+    add_filter '/spec/'
     add_group 'Ipam plugin', 'app/'
   end
 end
