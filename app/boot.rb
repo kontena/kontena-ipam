@@ -8,6 +8,7 @@ require 'logger'
 require 'ipaddr'
 
 require_relative '../lib/ipaddr_helpers'
+require_relative '../lib/json_model'
 require_relative '../lib/etcd/keys'
 
 require_relative 'logging'
