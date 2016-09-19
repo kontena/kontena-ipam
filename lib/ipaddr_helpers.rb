@@ -26,6 +26,11 @@ class IPAddr
         "#{to_s}/#{length}"
     end
 
+    # Serialize to JSON as a CIDR string
+    def to_json(*args)
+        to_cidr.to_json(*args)
+    end
+
     # Return a new IPAddr representing a smaller subnet within this larger supernet.
     #
     # The given subnet length must be longer than this supernet's length.

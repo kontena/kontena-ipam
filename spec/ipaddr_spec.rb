@@ -1,4 +1,4 @@
-require_relative '../app/ipaddr'
+require_relative '../lib/ipaddr_helpers'
 
 describe IPAddr do
   describe 'for IPv4 addresses' do
@@ -14,6 +14,10 @@ describe IPAddr do
       expect(IPAddr.new('10.80.0.0/12').to_cidr).to eq '10.80.0.0/12'
       expect(IPAddr.new('10.80.0.0/24').to_cidr).to eq '10.80.0.0/24'
       expect(IPAddr.new('10.80.1.1/32').to_cidr).to eq '10.80.1.1/32'
+    end
+
+    it 'encodes to JSON' do
+      expect(JSON.dump('test' => IPAddr.new('10.80.1.0/32'))).to eq '{"test":"10.80.1.0/32"}'
     end
   end
 
