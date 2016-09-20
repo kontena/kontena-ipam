@@ -5,47 +5,70 @@ module Addresses
     include Logging
 
     required do
-      string :pool_id, default: 'kontena'
+      string :pool_id
+    end
+
+    optional do
+      string :address, discard_empty: true
     end
 
     def validate
+      @address = IPAddr.new(self.address) if self.address
       resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
       add_error(:error, :not_found, 'Pool not found') if resp.nil?
-
-      @pool = resp.value
+      @pool = IPAddr.new(resp.value) unless resp.nil?
+      if @pool && self.address
+        add_error(:error, :address_not_within_pool,
+          "Given address not within pool") unless @pool.include?(self.address)
+      end
+    rescue IPAddr::InvalidAddressError => e
+      add_error(:address, :invalid, e.message)
     end
 
     def execute
+      info "requesting address(#{@address}) in pool: #{@pool}"
       addresses = available_addresses
-      info "requesting address in pool: #{@pool}"
-      info "available (#{self.pool_id}): #{addresses.size}"
-      if addresses.size > 100
-        ip = addresses[rand(0..100)]
+      info "available addresses: (#{self.pool_id}): #{addresses.size}"
+      ip = nil
+      if @address
+        if addresses.include?(@address)
+          ip = @address
+        else
+          add_error(:error, :not_available, 'Given address not available')
+          return
+        end
       else
-        ip = addresses[0]
-      end
-      if ip
-        etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip}", value: ip)
-      else
-        add_error(:error, :cannot_allocate, 'Cannot allocate ip, address pool is full')
+        if addresses.size > 100
+          ip = addresses[rand(0..100)]
+        else
+          ip = addresses[0]
+        end
       end
 
-      "#{ip}/#{@pool.split('/')[1]}"
+      if ip
+        etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip.to_s}", value: ip.to_s)
+      else
+        add_error(:error, :cannot_allocate, 'Cannot allocate ip, address pool is full')
+        return
+      end
+
+      "#{ip.to_s}/#{@pool.length}"
     end
 
     # @return [Array<IPAddr>]
     def available_addresses
-      address_pool - reserved_addresses
+      reserved = reserved_addresses
+      address_pool.reject { |a| reserved.include?(a)}
     end
 
     # @return [Array<IPAddr>]
     def address_pool
       unless self.class.pools[@pool]
         if self.pool_id == 'kontena'
-          # In the default kontena network, skip first 255 addresses for weave expose
-          self.class.pools[@pool] = IPAddr.new(@pool).to_range.to_a[256..-1].map{|ip| ip.to_s }
+          # In the default kontena network, skip first /24 block for weave expose
+          self.class.pools[@pool] = @pool.to_range.to_a[256...-1]
         else
-          self.class.pools[@pool] = IPAddr.new(@pool).to_range.to_a[1..-1].map{|ip| ip.to_s }
+          self.class.pools[@pool] = @pool.to_range.to_a[1...-1]
         end
       end
       self.class.pools[@pool]
@@ -55,9 +78,8 @@ module Addresses
     def reserved_addresses
       reserved_addresses = []
       response = etcd.get("/kontena/ipam/addresses/#{self.pool_id}/")
-      subnet_size = @pool.split('/')[1]
       response.children.map{|c|
-        reserved_addresses << c.value
+        reserved_addresses << IPAddr.new(c.value)
       }
       reserved_addresses
     end

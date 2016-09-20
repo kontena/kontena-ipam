@@ -1,3 +1,5 @@
+require 'ipaddr'
+
 require_relative 'app/boot'
 require_relative 'app/policy'
 
@@ -62,7 +64,8 @@ class IpamPlugin < Sinatra::Application
   post '/IpamDriver.RequestAddress' do
     data = JSON.parse(request.body.read)
     outcome = Addresses::Request.run(
-      pool_id: data['PoolID']
+      pool_id: data['PoolID'],
+      address: data['Address']
     )
     if outcome.success?
       JSON.dump(
@@ -101,4 +104,3 @@ class IpamPlugin < Sinatra::Application
     end
   end
 end
-
