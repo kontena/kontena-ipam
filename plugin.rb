@@ -3,6 +3,13 @@ require 'ipaddr'
 require_relative 'app/boot'
 require_relative 'app/policy'
 
+require 'sinatra/base'
+require 'sinatra/json'
+
+# Implement the libnetwork IPAM Driver API
+#
+# @see https://github.com/docker/libnetwork/blob/master/docs/ipam.md
+# @see https://github.com/docker/libnetwork/blob/master/ipams/remote/api/api.go
 class IpamPlugin < Sinatra::Application
   include Logging
   set :logging, true
@@ -20,86 +27,97 @@ class IpamPlugin < Sinatra::Application
     $etcd.set('/kontena/ipam/addresses/', dir: true) rescue nil
   end
 
+  # Return HTTP 400 { "Error": ... } if the Mutations::Command#validate rejects the parameters
+  error Mutations::ValidationException do
+    error = env['sinatra.error']
+
+    status 400
+    json 'Error' => error.message
+  end
+
+  # Return HTTP 500 { "Error": ... }
+  error do
+    error = env['sinatra.error']
+
+    status 500
+    json 'Error' => error.message
+  end
+
+  # Parse request body as JSON { ... } into the request params
+  #
+  # @see Sinatra::Base#params
+  before do
+    body = request.body.read
+
+    return if body.empty?
+
+    begin
+      params.merge! JSON.parse(body)
+    rescue JSON::JSONError => error
+      halt 400, "JSON parse error: #{error.message}"
+    end
+  end
+
   post '/Plugin.Activate' do
     $etcd.set('/kontena/ipam/pools/', dir: true) rescue nil
     $etcd.set('/kontena/ipam/addresses/', dir: true) rescue nil
-    JSON.dump(
-      'Implements' => ['IpamDriver']
+
+    json(
+      'Implements' => ['IpamDriver'],
     )
   end
 
-  post '/NetworkDriver.GetCapabilities' do
-    JSON.dump(
-      'Scope' => 'local'
-    )
+  post '/IpamDriver.GetCapabilities' do
+    json({})
   end
 
   post '/IpamDriver.GetDefaultAddressSpaces' do
-    JSON.dump(
+    json(
       "LocalDefaultAddressSpace" => "kontenalocal",
       "GlobalDefaultAddressSpace" => "kontenaglobal"
     )
   end
 
   post '/IpamDriver.RequestPool' do
-    data = JSON.parse(request.body.read)
-    params = {}
-    params[:subnet] = data['Pool']
-    params[:policy] = policy
-    params[:network] = data.dig('Options', 'network')
-    outcome = AddressPools::Request.run(params)
-    if outcome.success?
-      JSON.dump(
-        'PoolID' => outcome.result.id,
-        'Pool' => outcome.result.subnet.to_cidr,
-        'Data' => {}
-      )
-    else
-      response.status = 400
-      JSON.dump(outcome.errors.message)
-    end
+    pool = AddressPools::Request.run!(
+      policy: policy,
+      network: params.dig('Options', 'network'),
+      subnet: params['Pool'],
+    )
+
+    json(
+      'PoolID' => pool.id,
+      'Pool' => pool.subnet.to_cidr,
+      'Data' => {},
+    )
   end
 
   post '/IpamDriver.RequestAddress' do
-    data = JSON.parse(request.body.read)
-    outcome = Addresses::Request.run(
-      pool_id: data['PoolID'],
-      address: data['Address']
+    address = Addresses::Request.run!(
+      pool_id: params['PoolID'],
+      address: params['Address'],
     )
-    if outcome.success?
-      JSON.dump(
-        "Address" => outcome.result
-      )
-    else
-      response.status = 400
-      JSON.dump(outcome.errors.message)
-    end
+
+    json(
+      'Address' => address,
+      'Data'    => {},
+    )
   end
 
   post '/IpamDriver.ReleaseAddress' do
-    data = JSON.parse(request.body.read)
-    outcome = Addresses::Release.run(
-      pool: data['PoolID'],
-      address: data['Address']
+    Addresses::Release.run!(
+      pool: params['PoolID'],
+      address: params['Address']
     )
-    if outcome.success?
-      '{}'
-    else
-      response.status = 400
-      JSON.dump(outcome.errors.message)
-    end
+
+    json({})
   end
 
   post '/IpamDriver.ReleasePool' do
-    data = JSON.parse(request.body.read)
-    outcome = AddressPools::Release.run(
-      pool_id: data['PoolID']
+    AddressPools::Release.run!(
+      pool_id: params['PoolID']
     )
-    if outcome.success?
-      JSON.dump({})
-    else
-      response.status = 400
-      JSON.dump(outcome.errors.message)
-    end
+
+    json({})
   end
 end

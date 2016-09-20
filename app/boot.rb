@@ -1,6 +1,5 @@
 require 'rack'
 require 'rack/server'
-require 'sinatra/base'
 require 'json'
 require 'etcd'
 require 'mutations'
