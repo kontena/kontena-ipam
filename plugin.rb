@@ -63,10 +63,9 @@ class IpamPlugin < Sinatra::Application
 
   post '/IpamDriver.RequestAddress' do
     data = JSON.parse(request.body.read)
-    address = IPAddr.new(data['Address']) unless data['Address'].empty?
     outcome = Addresses::Request.run(
       pool_id: data['PoolID'],
-      address: address
+      address: data['Address']
     )
     if outcome.success?
       JSON.dump(

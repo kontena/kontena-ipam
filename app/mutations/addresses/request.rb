@@ -9,10 +9,11 @@ module Addresses
     end
 
     optional do
-      model :address, class: IPAddr
+      string :address, discard_empty: true
     end
 
     def validate
+      @address = IPAddr.new(self.address) if self.address
       resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
       add_error(:error, :not_found, 'Pool not found') if resp.nil?
       @pool = IPAddr.new(resp.value) unless resp.nil?
@@ -20,16 +21,18 @@ module Addresses
         add_error(:error, :address_not_within_pool,
           "Given address not within pool") unless @pool.include?(self.address)
       end
+    rescue IPAddr::InvalidAddressError => e
+      add_error(:address, :invalid, e.message)
     end
 
     def execute
-      info "requesting address(#{self.address}) in pool: #{@pool}"
+      info "requesting address(#{@address}) in pool: #{@pool}"
       addresses = available_addresses
       info "available addresses: (#{self.pool_id}): #{addresses.size}"
       ip = nil
-      if self.address
-        if addresses.include?(self.address.to_s)
-          ip = self.address
+      if @address
+        if addresses.include?(@address)
+          ip = @address
         else
           add_error(:error, :not_available, 'Given address not available')
           return
