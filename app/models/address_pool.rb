@@ -1,8 +1,9 @@
 class AddressPool
-  attr_accessor :id, :pool
-  
-  def initialize(id = nil, pool = nil)
-    @id = id
-    @pool = pool
-  end
+  include JSONModel
+  include EtcdModel
+
+  etcd_path '/kontena/ipam/pools/:id'
+  json_attr :subnet, type: IPAddr
+
+  attr_accessor :id, :subnet
 end

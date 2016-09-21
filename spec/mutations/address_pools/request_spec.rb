@@ -1,156 +1,183 @@
 describe AddressPools::Request do
-
-  let(:subject) do
-    described_class.new()
+  let :policy do
+    Policy.new(
+      'KONTENA_IPAM_SUPERNET' => '10.80.0.0/12',
+      'KONTENA_IPAM_SUBNET_LENGTH' => '24',
+    )
   end
 
-  let(:etcd) do
+  let :etcd do
     spy()
   end
 
-  before(:each) do
-    allow(subject).to receive(:etcd).and_return(etcd)
+  before do
+    EtcdModel.etcd = $etcd = etcd
+  end
+
+  describe '#validate' do
+    it 'rejects a missing network' do
+      subject = described_class.new(policy: policy)
+
+      expect(subject).to have_errors
+    end
+
+    it 'accepts a network' do
+      subject = described_class.new(policy: policy, network: 'kontena')
+
+      expect(subject).not_to have_errors, subject.validation_outcome.errors.inspect
+    end
+
+    it 'rejects an invalid subnet' do
+      subject = described_class.new(policy: policy, network: 'kontena', subnet: 'asdf')
+
+      expect(subject).to have_errors
+    end
+
+    it 'accepts a valid subnet' do
+      subject = described_class.new(policy: policy, network: 'kontena', subnet: '10.8.0.0/16')
+
+      expect(subject).not_to have_errors, subject.validation_outcome.errors.inspect
+    end
+  end
+
+  describe '#reserved_subnets' do
+    let :subject do
+      described_class.new(policy: policy, network: 'kontena')
+    end
+
+    it 'returns subnets if they exists in etcd' do
+      expect(AddressPool).to receive(:list).and_return([
+          AddressPool.new("kontena", subnet: IPAddr.new("10.81.0.0/16")),
+      ])
+
+      expect(subject.reserved_subnets).to eq [
+        IPAddr.new("10.81.0.0/16"),
+      ]
+    end
   end
 
   describe '#execute' do
-    let :policy do
-      spy()
+    context 'allocating a dynamic pool' do
+      let :subject do
+        described_class.new(policy: policy, network: 'kontena')
+      end
+
+      it 'returns address pool if it already exists in etcd' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
+
+        outcome = subject.run
+
+        expect(outcome).to be_success
+        expect(outcome.result).to eq AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
+      end
+
+      it 'returns new address pool' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return([])
+        expect(policy).to receive(:allocate_subnets).and_yield(IPAddr.new('10.80.0.0/24'))
+        expect(AddressPool).to receive(:create).with('kontena', subnet: IPAddr.new('10.80.0.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/24')))
+        expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success, outcome.errors.inspect
+        expect(outcome.result).to eq AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/24'))
+      end
+
+      it 'returns a different address pool if some other network already exists in etcd' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return([
+          AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')),
+        ])
+        expect(policy).to receive(:allocate_subnets).with([IPAddr.new('10.80.0.0/24')]).and_yield(IPAddr.new('10.80.1.0/24'))
+        expect(AddressPool).to receive(:create).with('kontena', subnet: IPAddr.new('10.80.1.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.1.0/24')))
+
+        expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success
+        expect(outcome.result).to eq AddressPool.new('kontena', subnet: IPAddr.new('10.80.1.0/24'))
+      end
+
+      it 'fails if the supernet is exhausted' do
+        pools = []
+        subnets = []
+        (80..95).each do |i|
+          subnets << subnet = IPAddr.new("10.#{i}.0.0/16")
+          pools << AddressPool.new("test-#{i}", subnet: subnet)
+        end
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return(pools)
+        expect(policy).to receive(:allocate_subnets).with(subnets).and_return(nil)
+
+        outcome = subject.run
+
+        expect(outcome).to_not be_success
+        expect(outcome.errors.symbolic[:subnet]).to eq :allocate
+      end
     end
 
-    it 'returns address pool if it is already reserved in etcd' do
-      subject = described_class.new(policy: policy, network: 'kontena', pool: '10.81.0.0/16')
-      allow(subject).to receive(:etcd).and_return(etcd)
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(double({value: '10.81.0.0/16'}))
-      pool = subject.execute
-      expect(pool.id).to eq('kontena')
-      expect(pool.pool).to eq('10.81.0.0/16')
-    end
+    context 'allocating a static pool' do
+      let :subject do
+        described_class.new(policy: policy, network: 'kontena', subnet: '10.81.0.0/16')
+      end
 
-    it 'errors if given pool already reserved' do
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/test').and_return(nil)
-      subject = described_class.new(network: 'test', pool: '10.1.2.0/16')
-      allow(subject).to receive(:etcd).and_return(etcd)
-      expect(subject).to receive(:reserve_pool).with('test', '10.1.2.0/16').and_return(nil)
-      expect(subject).to receive(:add_error)
-      subject.execute
-    end
+      it 'returns address pool if it already exists in etcd' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
 
-    it 'reserves given pool' do
-      subject = described_class.new(policy: policy, network: 'test', pool: '10.1.2.0/16')
-      allow(subject).to receive(:etcd).and_return(etcd)
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/test').and_return(nil)
+        outcome = subject.run
 
-      expect(subject).to receive(:reserve_pool).with('test', '10.1.2.0/16').and_return('10.1.2.0/16')
-      pool = subject.execute
-      expect(pool.id).to eq('test')
-      expect(pool.pool).to eq('10.1.2.0/16')
-    end
+        expect(outcome).to be_success
+        expect(outcome.result).to eq AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
+      end
 
-    it 'reserves new pool' do
-      subject = described_class.new(policy: policy, network: 'test')
-      allow(subject).to receive(:etcd).and_return(etcd)
+      it 'fails if the network already exists with a different subnet' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
 
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/test').and_return(nil)
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double(children: []))
+        outcome = subject.run
 
-      expect(policy).to receive(:allocate_subnet).with([]).and_return(IPAddr.new('10.80.0.0/24'))
+        expect(outcome).to_not be_success
+        expect(outcome.errors.symbolic[:subnet]).to eq :mismatch
+      end
 
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.80.0.0/24')
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
+      it 'fails if a network already exists with the same subnet' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return([
+          AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16')),
+        ])
 
-      pool = subject.execute
-      expect(pool.id).to eq('test')
-      expect(pool.pool).to eq('10.80.0.0/24')
-    end
+        outcome = subject.run
 
-  end
+        expect(outcome).to_not be_success
+        expect(outcome.errors.symbolic[:subnet]).to eq :conflict
+      end
 
-  describe '#reserve_pool' do
-    it 'generates default pool when no pool given' do
-      expect(subject).to receive(:generate_default_pool).with('test')
-      subject.reserve_pool('test', '')
-    end
+      it 'fails if a network already exists with an overlapping subnet' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return([
+          AddressPool.new('test', subnet: IPAddr.new('10.81.10.0/24')),
+        ])
 
-    it 'reserves given pool' do
-      expect(subject).to receive(:reserve_requested_pool).with('test', '10.1.2.0/16')
-      subject.reserve_pool('test', '10.1.2.0/16')
-    end
-  end
+        outcome = subject.run
 
-  describe '#generate_default_pool' do
-    let :policy do
-      Policy.new(
-        'KONTENA_IPAM_SUPERNET' => '10.80.0.0/12',
-        'KONTENA_IPAM_SUBNET_LENGTH' => '24',
-      )
-    end
+        expect(outcome).to_not be_success
+        expect(outcome.errors.symbolic[:subnet]).to eq :conflict
+      end
 
-    before do
-      allow(subject).to receive(:policy).and_return(policy)
-    end
+      it 'returns address pool if some other network exists in etcd' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return([
+          AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')),
+        ])
+        expect(AddressPool).to receive(:create).with('kontena', subnet: IPAddr.new('10.81.0.0/16')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
+        expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true)
 
-    it 'reserves new pool' do
-      reserved_pools = []
+        outcome = subject.run
 
-      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
-      expect(policy).to receive(:allocate_subnet).with(reserved_pools).and_call_original
-
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.80.0.0/24')
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
-
-      pool = subject.generate_default_pool('test')
-      expect(pool).to eq '10.80.0.0/24'
-    end
-
-    it 'reserves new pool after last reserved' do
-      reserved_pools = [IPAddr.new('10.80.0.0/16'), IPAddr.new('10.81.0.0/24')]
-
-      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
-      expect(policy).to receive(:allocate_subnet).with(reserved_pools).and_call_original
-
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.81.1.0/24')
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
-
-      pool = subject.generate_default_pool('test')
-      expect(pool).to eq '10.81.1.0/24'
-    end
-
-    it 'returns nil if pool cannot be generated' do
-      reserved_pools = (80..95).map { |i| IPAddr.new("10.#{i}.0.0/16") }
-
-      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
-      expect(policy).to receive(:allocate_subnet).with(reserved_pools).and_call_original
-
-      pool = subject.generate_default_pool('test')
-      expect(pool).to be_nil
-    end
-  end
-
-  describe '#reserve_requested_pool' do
-    it 'reserves given pool when no existing pools' do
-      expect(subject).to receive(:reserved_pools).and_return([])
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.82.0.0/16')
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
-
-      subject.reserve_requested_pool('test', '10.82.0.0/16')
-    end
-
-    it 'reserves given pool when no overlaps with existing pools' do
-      reserved_pools = [IPAddr.new('10.82.0.0/16'), IPAddr.new('10.84.0.0/16')]
-      expect(subject).to receive(:reserved_pools).and_return(reserved_pools)
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/test', value: '10.83.0.0/17')
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/test', dir: true)
-
-      subject.reserve_requested_pool('test', '10.83.0.0/17')
-    end
-
-    it 'fails to reserve given pool when overlaps with existing pools' do
-      reserved_pools = [IPAddr.new('10.82.0.0/16'), IPAddr.new('10.84.0.0/16')]
-      expect(subject).to receive(:reserved_pools).twice.and_return(reserved_pools)
-      expect(etcd).not_to receive(:set)
-
-      subject.reserve_requested_pool('test', '10.82.0.0/17')
-      subject.reserve_requested_pool('test', '10.80.0.0/14')
+        expect(outcome).to be_success
+        expect(outcome.result).to eq AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
+      end
     end
   end
 end

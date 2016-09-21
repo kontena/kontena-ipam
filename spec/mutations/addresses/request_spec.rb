@@ -6,7 +6,7 @@ describe Addresses::Request do
   end
 
   before(:each) do
-    $etcd = etcd
+    $etcd = EtcdModel.etcd = etcd
   end
 
   describe '#validate' do
@@ -21,7 +21,7 @@ describe Addresses::Request do
     it 'errors when address not in pool range' do
       expect(etcd).to receive(:get)
         .with('/kontena/ipam/pools/foo')
-        .and_return(double(value: '10.81.0.0/16'))
+        .and_return(double(value: '{"subnet": "10.81.0.0/16"}'))
 
       subject = described_class.new(pool_id: 'foo', address: '10.99.100.100')
 
@@ -29,13 +29,13 @@ describe Addresses::Request do
     end
 
     it 'retrives pool when found' do
-      value = double(value: '10.81.0.0/16')
+      value = double(value: '{"subnet": "10.81.0.0/16"}')
       expect(etcd).to receive(:get).with('/kontena/ipam/pools/found').and_return(value)
 
       subject = described_class.new(pool_id: 'found')
 
-      expect(subject.has_errors?).to be_falsey
-      expect(subject.instance_variable_get(:@pool)).to eq('10.81.0.0/16')
+      expect(subject.has_errors?).to be_falsey, subject.validation_outcome.inspect
+      expect(subject.instance_variable_get(:@pool)).to eq AddressPool.new('found', subnet: IPAddr.new('10.81.0.0/16'))
     end
 
     it 'validates address format if given' do
@@ -56,7 +56,7 @@ describe Addresses::Request do
       expect(etcd).to receive(:set)
         .with('/kontena/ipam/addresses/pool/10.81.100.100', {:value=>"10.81.100.100"})
       subject = described_class.new(pool_id: 'pool', address: '10.81.100.100')
-      subject.instance_variable_set(:@pool, IPAddr.new('10.81.0.0/16'))
+      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.81.0.0/16')))
       subject.instance_variable_set(:@address, IPAddr.new('10.81.100.100'))
       expect(subject).to receive(:available_addresses)
         .and_return(IPAddr.new('10.81.0.0/16').to_range.to_a)
@@ -68,7 +68,7 @@ describe Addresses::Request do
     it 'errors if given address not available' do
       ip = IPAddr.new('10.81.100.100')
       subject = described_class.new(pool_id: 'pool', address: ip)
-      subject.instance_variable_set(:@pool, IPAddr.new('10.81.0.0/16'))
+      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.81.0.0/16')))
       subject.instance_variable_set(:@address, ip)
 
       available = IPAddr.new('10.81.0.0/16').to_range.to_a
@@ -86,7 +86,7 @@ describe Addresses::Request do
       subject = described_class.new(pool_id: 'pool')
       expect(subject).to receive(:available_addresses)
         .and_return(IPAddr.new('10.81.0.0/16').to_range.to_a)
-      subject.instance_variable_set(:@pool, '10.81.0.0/16')
+      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.81.0.0/16')))
 
       expect(subject.run.result).not_to be_nil
 
@@ -120,7 +120,7 @@ describe Addresses::Request do
     end
     it 'removes all reserved addresses from pool' do
       subject = described_class.new(pool_id: 'kontena')
-      subject.instance_variable_set(:@pool, IPAddr.new('10.81.0.0/30'))
+      subject.instance_variable_set(:@pool, AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
       expect(subject).to receive(:reserved_addresses).and_return([IPAddr.new('10.81.0.1')])
       expect(subject).to receive(:address_pool).and_return(IPAddr.new('10.81.0.0/30').to_range.to_a)
 
@@ -129,7 +129,7 @@ describe Addresses::Request do
 
     it 'returns full pool if no addresses reserved' do
       subject = described_class.new(pool_id: 'kontena')
-      subject.instance_variable_set(:@pool, IPAddr.new('10.81.0.0/30'))
+      subject.instance_variable_set(:@pool, AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
       expect(subject).to receive(:reserved_addresses).and_return([])
       expect(subject).to receive(:address_pool).and_return(IPAddr.new('10.81.0.0/30').to_range.to_a)
 
@@ -146,7 +146,7 @@ describe Addresses::Request do
 
     it 'returns whole pool when not default kontena pool' do
       subject = described_class.new(pool_id: 'pool')
-      subject.instance_variable_set(:@pool, IPAddr.new('10.89.0.0/24'))
+      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.89.0.0/24')))
 
       pool = subject.address_pool
       expect(pool.size).to eq(254)
@@ -155,7 +155,7 @@ describe Addresses::Request do
 
     it 'returns reducted pool when default kontena pool' do
       subject = described_class.new(pool_id: 'kontena')
-      subject.instance_variable_set(:@pool, IPAddr.new('10.81.0.0/16'))
+      subject.instance_variable_set(:@pool, AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
 
       pool = subject.address_pool
       expect(pool.size).to eq(65534 - 255)

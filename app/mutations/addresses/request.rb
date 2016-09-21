@@ -2,6 +2,10 @@ require 'ipaddr'
 
 module Addresses
   class Request < Mutations::Command
+    class PoolError < StandardError
+
+    end
+
     include Logging
 
     required do
@@ -13,20 +17,23 @@ module Addresses
     end
 
     def validate
-      @address = IPAddr.new(self.address) if self.address
-      resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
-      add_error(:error, :not_found, 'Pool not found') if resp.nil?
-      @pool = IPAddr.new(resp.value) unless resp.nil?
-      if @pool && self.address
-        add_error(:error, :address_not_within_pool,
-          "Given address not within pool") unless @pool.include?(self.address)
+      @address = IPAddr.new(self.address) if self.address_present?
+      @pool = AddressPool.get(pool_id)
+
+      raise PoolError, "Pool not found: #{pool_id}" unless @pool
+
+      if @address
+        add_error(:address, :out_of_pool,
+          "Given address not within pool") unless @pool.subnet.include?(@address)
       end
     rescue IPAddr::InvalidAddressError => e
       add_error(:address, :invalid, e.message)
+    rescue PoolError => e
+      add_error(:pool_id, :not_found, e.message)
     end
 
     def execute
-      info "requesting address(#{@address}) in pool: #{@pool}"
+      info "requesting address(#{@address}) in pool: #{@pool.subnet}"
       addresses = available_addresses
       info "available addresses: (#{self.pool_id}): #{addresses.size}"
       ip = nil
@@ -34,7 +41,7 @@ module Addresses
         if addresses.include?(@address)
           ip = @address
         else
-          add_error(:error, :not_available, 'Given address not available')
+          add_error(:address, :not_available, 'Given address not available')
           return
         end
       else
@@ -48,11 +55,11 @@ module Addresses
       if ip
         etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip.to_s}", value: ip.to_s)
       else
-        add_error(:error, :cannot_allocate, 'Cannot allocate ip, address pool is full')
+        add_error(:address, :cannot_allocate, 'Cannot allocate ip, address pool is full')
         return
       end
 
-      "#{ip.to_s}/#{@pool.length}"
+      "#{ip.to_s}/#{@pool.subnet.length}"
     end
 
     # @return [Array<IPAddr>]
@@ -63,15 +70,15 @@ module Addresses
 
     # @return [Array<IPAddr>]
     def address_pool
-      unless self.class.pools[@pool]
+      unless self.class.pools[@pool.subnet]
         if self.pool_id == 'kontena'
           # In the default kontena network, skip first /24 block for weave expose
-          self.class.pools[@pool] = @pool.to_range.to_a[256...-1]
+          self.class.pools[@pool.subnet] = @pool.subnet.to_range.to_a[256...-1]
         else
-          self.class.pools[@pool] = @pool.to_range.to_a[1...-1]
+          self.class.pools[@pool.subnet] = @pool.subnet.to_range.to_a[1...-1]
         end
       end
-      self.class.pools[@pool]
+      self.class.pools[@pool.subnet]
     end
 
     # @return [Array<IPAddr>]

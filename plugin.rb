@@ -44,15 +44,14 @@ class IpamPlugin < Sinatra::Application
   post '/IpamDriver.RequestPool' do
     data = JSON.parse(request.body.read)
     params = {}
-    params[:id] = data['PoolID'] unless data['PoolID'].to_s.empty?
-    params[:pool] = data['Pool'] unless data['Pool'].to_s.empty?
+    params[:subnet] = data['Pool']
     params[:policy] = policy
     params[:network] = data.dig('Options', 'network')
     outcome = AddressPools::Request.run(params)
     if outcome.success?
       JSON.dump(
         'PoolID' => outcome.result.id,
-        'Pool' => outcome.result.pool,
+        'Pool' => outcome.result.subnet.to_cidr,
         'Data' => {}
       )
     else
@@ -94,10 +93,10 @@ class IpamPlugin < Sinatra::Application
   post '/IpamDriver.ReleasePool' do
     data = JSON.parse(request.body.read)
     outcome = AddressPools::Release.run(
-      id: data['PoolID']
+      pool_id: data['PoolID']
     )
     if outcome.success?
-      '{}'
+      JSON.dump({})
     else
       response.status = 400
       JSON.dump(outcome.errors.message)
