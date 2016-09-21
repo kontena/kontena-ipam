@@ -142,7 +142,7 @@ describe IpamPlugin do
   describe '/IpamDriver.ReleaseAddress' do
     it 'accepts the required parameters' do
       # XXX: with netmask or not?
-      expect(Addresses::Release).to receive(:run!).with(pool: 'test', address: '10.80.0.63/24').and_return(nil)
+      expect(Addresses::Release).to receive(:run!).with(pool_id: 'test', address: '10.80.0.63/24').and_return(nil)
 
       data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.63/24'}
 

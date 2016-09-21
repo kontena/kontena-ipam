@@ -106,7 +106,7 @@ class IpamPlugin < Sinatra::Application
 
   post '/IpamDriver.ReleaseAddress' do
     Addresses::Release.run!(
-      pool: params['PoolID'],
+      pool_id: params['PoolID'],
       address: params['Address']
     )
 
