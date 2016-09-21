@@ -120,9 +120,19 @@ describe IpamPlugin do
   end
 
   describe '/IpamDriver.RequestAddress' do
-    it 'accepts with only the required parameters' do
-      expect(Addresses::Request).to receive(:run!).with(pool_id: 'test', address: nil).and_return('10.80.0.63/24')
+    let :pool do
+      AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24'))
+    end
 
+    let :addr1 do
+      Address.new('test', '10.80.0.1', address: pool.subnet.subnet_addr('10.80.0.1'))
+    end
+    let :addr63 do
+      Address.new('test', '10.80.0.63', address: pool.subnet.subnet_addr('10.80.0.63'))
+    end
+
+    it 'accepts with only the required parameters' do
+      expect(Addresses::Request).to receive(:run!).with(policy: policy, pool_id: 'test', address: nil).and_return(addr63)
       data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test'}
 
       expect(last_response).to be_ok, last_response.errors
@@ -130,7 +140,7 @@ describe IpamPlugin do
     end
 
     it 'accepts with an empty optional params' do
-      expect(Addresses::Request).to receive(:run!).with(pool_id: 'test', address: '').and_return('10.80.0.63/24')
+      expect(Addresses::Request).to receive(:run!).with(policy: policy, pool_id: 'test', address: '').and_return(addr63)
 
       data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => ''}
 
@@ -139,7 +149,7 @@ describe IpamPlugin do
     end
 
     it 'accepts with an optional params' do
-      expect(Addresses::Request).to receive(:run!).with(pool_id: 'test', address: '10.80.0.1').and_return('10.80.0.1/24')
+      expect(Addresses::Request).to receive(:run!).with(policy: policy, pool_id: 'test', address: '10.80.0.1').and_return(addr1)
 
       data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
 

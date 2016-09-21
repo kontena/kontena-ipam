@@ -1,166 +1,260 @@
-
 describe Addresses::Request do
-
-  let(:etcd) do
+  let :policy do
     double()
   end
 
-  before(:each) do
-    $etcd = EtcdModel.etcd = etcd
+  before do
+    allow(policy).to receive(:is_a?).with(Hash).and_return(false)
+    allow(policy).to receive(:is_a?).with(Array).and_return(false)
+    allow(policy).to receive(:is_a?).with(Policy).and_return(true)
   end
 
   describe '#validate' do
-    it 'errors when pool no found' do
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/not_found').and_raise(Etcd::KeyNotFound)
+    it 'errors when pool not found' do
+      expect(AddressPool).to receive(:get).with('not_found').and_return(nil)
 
-      subject = described_class.new(pool_id: 'not_found')
+      subject = described_class.new(policy: policy, pool_id: 'not_found')
 
-      expect(subject.has_errors?).to be_truthy
+      expect(subject).to have_errors
+      expect(subject.validation_outcome.errors.symbolic[:pool]).to eq :not_found
+    end
+
+    it 'errors when an invalid address is given' do
+      subject = described_class.new(policy: policy, pool_id: 'foo', address: 'fdfdfds')
+
+      expect(subject).to have_errors
+      expect(subject.validation_outcome.errors.symbolic[:address]).to eq :invalid
     end
 
     it 'errors when address not in pool range' do
-      expect(etcd).to receive(:get)
-        .with('/kontena/ipam/pools/foo')
-        .and_return(double(value: '{"subnet": "10.81.0.0/16"}'))
+      expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
 
-      subject = described_class.new(pool_id: 'foo', address: '10.99.100.100')
+      subject = described_class.new(policy: policy, pool_id: 'kontena', address: '10.99.100.100')
 
-      expect(subject.has_errors?).to be_truthy
+      expect(subject).to have_errors
+      expect(subject.validation_outcome.errors.symbolic[:address]).to eq :out_of_pool
     end
 
     it 'retrives pool when found' do
-      value = double(value: '{"subnet": "10.81.0.0/16"}')
-      expect(etcd).to receive(:get).with('/kontena/ipam/pools/found').and_return(value)
+      expect(AddressPool).to receive(:get).with('found').and_return(AddressPool.new('found', subnet: IPAddr.new('10.81.0.0/16')))
 
-      subject = described_class.new(pool_id: 'found')
+      subject = described_class.new(policy: policy, pool_id: 'found')
 
-      expect(subject.has_errors?).to be_falsey, subject.validation_outcome.inspect
+      expect(subject).not_to have_errors, subject.validation_outcome.errors.inspect
+
       expect(subject.instance_variable_get(:@pool)).to eq AddressPool.new('found', subnet: IPAddr.new('10.81.0.0/16'))
     end
-
-    it 'validates address format if given' do
-      value = double(value: '10.81.0.0/16')
-      subject = described_class.new(pool_id: 'foo', address: 'fdfdfds')
-      expect(subject.has_errors?).to be_truthy
-    end
-
   end
 
-  describe '#execute' do
-
-    before(:each) do
-      allow_any_instance_of(described_class).to receive(:validate)
+  context 'when allocating a static address' do
+    let :pool do
+      AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
     end
 
-    it 'reserves given address if available' do
-      expect(etcd).to receive(:set)
-        .with('/kontena/ipam/addresses/pool/10.81.100.100', {:value=>"10.81.100.100"})
-      subject = described_class.new(pool_id: 'pool', address: '10.81.100.100')
-      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.81.0.0/16')))
-      subject.instance_variable_set(:@address, IPAddr.new('10.81.100.100'))
-      expect(subject).to receive(:available_addresses)
-        .and_return(IPAddr.new('10.81.0.0/16').to_range.to_a)
+    let :subject do
+      expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
 
-      expect(subject.execute).to eq('10.81.100.100/16')
+      subject = described_class.new(policy: policy, pool_id: 'kontena', address: '10.81.100.100')
 
+      raise subject.validation_outcome.errors.inspect if subject.has_errors?
+
+      subject
     end
 
-    it 'errors if given address not available' do
-      ip = IPAddr.new('10.81.100.100')
-      subject = described_class.new(pool_id: 'pool', address: ip)
-      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.81.0.0/16')))
-      subject.instance_variable_set(:@address, ip)
+    describe '#execute' do
+      it 'reserves given address if available' do
+        addr = Address.new('kontena', '10.81.100.100', address: pool.subnet.subnet_addr('10.81.100.100'))
 
-      available = IPAddr.new('10.81.0.0/16').to_range.to_a
-      available.delete(ip)
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.100.100')).and_return(addr)
 
-      expect(subject).to receive(:available_addresses).and_return(available)
+        outcome = subject.run
 
+        expect(outcome).to be_success, outcome.errors.inspect
+        expect(outcome.result).to eq addr
+        expect(outcome.result.address.to_cidr).to eq '10.81.100.100/16'
+      end
 
-      expect(subject.execute).to be_nil
-    end
+      it 'errors if given address conflicts' do
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.100.100')).and_return(nil)
 
-    it 'reserves random address if address not given' do
-      expect(etcd).to receive(:set)
+        outcome = subject.run
 
-      subject = described_class.new(pool_id: 'pool')
-      expect(subject).to receive(:available_addresses)
-        .and_return(IPAddr.new('10.81.0.0/16').to_range.to_a)
-      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.81.0.0/16')))
-
-      expect(subject.run.result).not_to be_nil
-
-    end
-
-  end
-
-
-  describe '#reserved_addresses' do
-
-    before(:each) do
-      allow_any_instance_of(described_class).to receive(:validate)
-    end
-
-    it 'returns all reserved addresses' do
-      subject = described_class.new(pool_id: 'pool')
-      expected_addresses = ['10.81.1.1', '10.81.1.2']
-      expect(etcd).to receive(:get).with('/kontena/ipam/addresses/pool/')
-        .and_return(double(children: [
-          double({value: expected_addresses[0]}),
-          double({value: expected_addresses[1]})
-          ]))
-      expect(subject.reserved_addresses).to eq(expected_addresses.map {|a| IPAddr.new(a)})
-    end
-
-  end
-
-  describe '#available_addresses' do
-    before(:each) do
-      allow_any_instance_of(described_class).to receive(:validate)
-    end
-    it 'removes all reserved addresses from pool' do
-      subject = described_class.new(pool_id: 'kontena')
-      subject.instance_variable_set(:@pool, AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
-      expect(subject).to receive(:reserved_addresses).and_return([IPAddr.new('10.81.0.1')])
-      expect(subject).to receive(:address_pool).and_return(IPAddr.new('10.81.0.0/30').to_range.to_a)
-
-      expect(subject.available_addresses.size).to eq(3)
-    end
-
-    it 'returns full pool if no addresses reserved' do
-      subject = described_class.new(pool_id: 'kontena')
-      subject.instance_variable_set(:@pool, AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
-      expect(subject).to receive(:reserved_addresses).and_return([])
-      expect(subject).to receive(:address_pool).and_return(IPAddr.new('10.81.0.0/30').to_range.to_a)
-
-      expect(subject.available_addresses.size).to eq(4)
-    end
-
-  end
-
-  describe '#address_pool' do
-
-    before(:each) do
-      allow_any_instance_of(described_class).to receive(:validate)
-    end
-
-    it 'returns whole pool when not default kontena pool' do
-      subject = described_class.new(pool_id: 'pool')
-      subject.instance_variable_set(:@pool, AddressPool.new('pool', subnet: IPAddr.new('10.89.0.0/24')))
-
-      pool = subject.address_pool
-      expect(pool.size).to eq(254)
-      expect(subject.class.pools[IPAddr.new('10.89.0.0/24')]).to eq(pool)
-    end
-
-    it 'returns reducted pool when default kontena pool' do
-      subject = described_class.new(pool_id: 'kontena')
-      subject.instance_variable_set(:@pool, AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
-
-      pool = subject.address_pool
-      expect(pool.size).to eq(65534 - 255)
-      expect(subject.class.pools[IPAddr.new('10.81.0.0/16')]).to eq(pool)
+        expect(outcome).to_not be_success, outcome.errors.inspect
+        expect(outcome.errors.symbolic[:address]).to eq :conflict
+      end
     end
   end
 
+  context 'when not using iprange' do
+    let :pool do
+      AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
+    end
+
+    let :subject do
+      expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
+
+      subject = described_class.new(policy: policy, pool_id: 'kontena')
+
+      raise subject.validation_outcome.errors.inspect if subject.has_errors?
+
+      subject
+    end
+
+    describe '#available_addresses' do
+      it 'returns the full subnet pool' do
+        expect(pool).to receive(:reserved).and_return([])
+
+        addresses = subject.available_addresses
+
+        expect(addresses.first).to eq IPAddr.new('10.81.0.1')
+        expect(addresses.last).to eq IPAddr.new('10.81.255.254')
+        expect(addresses.size).to eq(2**16 - 2)
+      end
+    end
+
+    describe '#execute' do
+      it 'reserves dynamic address if pool is empty' do
+        addr = Address.new('kontena', '10.81.100.100', address: pool.subnet.subnet_addr('10.81.100.100'))
+        expect(addr.address.to_cidr).to eq '10.81.100.100/16'
+
+        allow(pool).to receive(:reserved).and_return([]) # XXX: called twice?
+        expect(policy).to receive(:allocate_address).with(subject.available_addresses).and_return(IPAddr.new('10.81.100.100'))
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.100.100')).and_return(addr)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success, outcome.errors.inspect
+        expect(outcome.result).to eq addr
+        expect(outcome.result.address.to_cidr).to eq '10.81.100.100/16'
+      end
+
+      it 'errors if the pool is full' do
+        expect(pool).to receive(:reserved).and_return(pool.subnet.list_hosts)
+        expect(policy).to receive(:allocate_address).with([]).and_return(nil)
+
+        outcome = subject.run
+
+        expect(outcome).to_not be_success, outcome.errors.inspect
+        expect(outcome.errors.symbolic[:address]).to eq :allocate
+      end
+    end
+  end
+
+  context 'when using iprange' do
+    let :pool do
+      AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.1.0/29'))
+    end
+
+    let :addresses do
+      [
+        IPAddr.new('10.81.1.1'),
+        IPAddr.new('10.81.1.2'),
+        IPAddr.new('10.81.1.3'),
+        IPAddr.new('10.81.1.4'),
+        IPAddr.new('10.81.1.5'),
+        IPAddr.new('10.81.1.6'),
+      ]
+    end
+
+    let :reserved do
+      [
+        IPAddr.new('10.81.1.2'),
+        IPAddr.new('10.81.1.3'),
+      ]
+    end
+
+    let :available do
+      [
+        IPAddr.new('10.81.1.1'),
+        IPAddr.new('10.81.1.4'),
+        IPAddr.new('10.81.1.5'),
+        IPAddr.new('10.81.1.6'),
+      ]
+    end
+
+    let :subject do
+      expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
+
+      subject = described_class.new(policy: policy, pool_id: 'kontena')
+
+      raise subject.validation_outcome.errors.inspect if subject.has_errors?
+
+      subject
+    end
+
+    describe '#available_addresses' do
+      it 'returns the reduced iprange pool' do
+        expect(pool).to receive(:reserved).and_return([])
+
+        expect(subject.available_addresses).to eq addresses
+      end
+
+      it 'excludes all reserved addresses from the pool' do
+
+        expect(pool).to receive(:reserved).and_return(reserved)
+
+        expect(subject.available_addresses).to eq available
+      end
+    end
+
+    describe '#execute' do
+      it 'reserves dynamic address if pool is empty' do
+        addr = Address.new('kontena', '10.81.1.1', address: pool.subnet.subnet_addr('10.81.1.1'))
+
+        expect(pool).to receive(:reserved).and_return([])
+        expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1'))
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.1')).and_return(addr)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success, outcome.errors.inspect
+        expect(outcome.result).to eq addr
+        expect(outcome.result.address.to_cidr).to eq '10.81.1.1/16'
+      end
+
+      it 'reserves dynamic address if pool has reserved addresses' do
+        addr = Address.new('kontena', '10.81.1.1', address: pool.subnet.subnet_addr('10.81.1.1'))
+
+        expect(pool).to receive(:reserved).and_return(reserved)
+        expect(policy).to receive(:allocate_address).with(available).and_return(IPAddr.new('10.81.1.1'))
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.1')).and_return(addr)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success, outcome.errors.inspect
+        expect(outcome.result).to eq addr
+        expect(outcome.result.address.to_cidr).to eq '10.81.1.1/16'
+      end
+
+      it 'errors if the pool is full' do
+        expect(pool).to receive(:reserved).and_return(addresses)
+        expect(policy).to receive(:allocate_address).with([]).and_return(nil)
+
+        outcome = subject.run
+
+        expect(outcome).to_not be_success, outcome.errors.inspect
+        expect(outcome.errors.symbolic[:address]).to eq :allocate
+      end
+
+      it 'retries allocation if reservation fails' do
+        addr = Address.new('kontena', '10.81.1.2', address: pool.subnet.subnet_addr('10.81.1.2'))
+
+        expect(pool).to receive(:reserved).and_return([])
+        expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1'))
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.1')).and_return(nil)
+
+        expect(pool).to receive(:reserved).and_return([IPAddr.new('10.81.1.1')])
+        expect(policy).to receive(:allocate_address).with(addresses - [IPAddr.new('10.81.1.1')]).and_return(IPAddr.new('10.81.1.2'))
+        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.2')).and_return(addr)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success, outcome.errors.inspect
+        expect(outcome.result).to eq addr
+        expect(outcome.result.address.to_cidr).to eq '10.81.1.2/16'
+      end
+
+    end
+
+  end
 end
