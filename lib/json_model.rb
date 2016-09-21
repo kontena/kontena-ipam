@@ -103,14 +103,14 @@ module JSONModel
   # Serialize to encoded JSON object
   #
   # @return [String] JSON-encoded object
-  def to_json
+  def to_json(*args)
     object = {}
 
     self.class.json_attrs.each do |sym, json_attr|
       json_attr.store(object, self.instance_variable_get("@#{sym}"))
     end
 
-    JSON.generate(object)
+    object.to_json(*args)
   end
 
   # Set attributes from encoded JSON object
