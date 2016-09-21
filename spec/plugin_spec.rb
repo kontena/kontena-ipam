@@ -79,11 +79,11 @@ describe IpamPlugin do
 
       expect(last_response.status).to eq(400), last_response.errors
 
-      expect(data).to eq('Error' => "invalid address")
+      expect(data).to eq('Error' => "Invalid address")
     end
 
     it 'accepts with only the required parameters' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: nil, iprange: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
 
       data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}}
 
@@ -92,18 +92,27 @@ describe IpamPlugin do
     end
 
     it 'accepts with an empty optional param' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: '').and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: '', iprange: '').and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
 
-      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}, 'Pool' => ''}
+      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}, 'Pool' => '', 'SubPool' => ''}
 
       expect(last_response).to be_ok, last_response.errors
       expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
     end
 
     it 'accepts with an optional pool' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
 
       data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16'}
+
+      expect(last_response).to be_ok, last_response.errors
+      expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.80.0.0/16', 'Data' => {})
+    end
+
+    it 'accepts with an optional iprange' do
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.127.0/17').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
+
+      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16', 'SubPool' => '10.81.127.0/17'}
 
       expect(last_response).to be_ok, last_response.errors
       expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.80.0.0/16', 'Data' => {})

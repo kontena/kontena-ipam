@@ -83,6 +83,7 @@ class IpamPlugin < Sinatra::Application
       policy: policy,
       network: params.dig('Options', 'network'),
       subnet: params['Pool'],
+      iprange: params['SubPool'],
     )
 
     json(
