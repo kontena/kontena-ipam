@@ -16,8 +16,6 @@ module AddressPools
 
     def execute
       @pool.delete!
-
-      $etcd.delete("/kontena/ipam/addresses/#{@pool.id}/", recursive: true)
     end
   end
 end
