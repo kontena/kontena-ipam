@@ -201,6 +201,22 @@ module EtcdModel
 
     public
 
+    # Create directory for objects under the given partial key prefix.
+    # Idempotent, does nothing if the directory already exists.
+    #
+    # For safety, every key value is checked to be non-nil and non-empty.
+    #
+    # @raise ArgumentError if any invalid keys are given
+    # @param key [String] key values
+    def mkdir(*key)
+      prefix = @etcd_schema.prefix(*key)
+
+      etcd.set(prefix, dir: true, prevExist: false)
+    rescue Etcd::NodeExist => errors
+      # XXX: the same error is returned if the path exists as a file
+      return
+    end
+
     # Create and return new object in etcd, or raise Conflict if already exists
     #
     # @param key [Array<String>] object key values
@@ -255,7 +271,7 @@ module EtcdModel
     # @yieldparam object [EtcdModel]
     def each(*key, &block)
       prefix = @etcd_schema.prefix(*key)
-      response = EtcdModel.etcd.get(prefix)
+      response = etcd.get(prefix)
 
       for node in response.children
         name = node.key[prefix.length..-1]
@@ -298,7 +314,7 @@ module EtcdModel
     def delete(*key)
       prefix = @etcd_schema.prefix(*key)
 
-      EtcdModel.etcd.delete(prefix, recursive: true)
+      etcd.delete(prefix, recursive: true)
     end
   end
 

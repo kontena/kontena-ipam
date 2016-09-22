@@ -107,6 +107,14 @@ describe EtcdModel do
       end
     end
 
+    describe '#mkdir' do
+      it 'creates directory in etcd' do
+        expect(etcd).to receive(:set).with('/test/', dir: true, prevExist: false)
+
+        TestEtcd.mkdir()
+      end
+    end
+
     describe '#get' do
       it 'returns nil if missing from etcd' do
         expect(etcd).to receive(:get).with('/test/test1').and_raise(Etcd::KeyNotFound)
@@ -208,6 +216,20 @@ describe EtcdModel do
 
     it 'renders to path for the object' do
       expect(TestEtcdChild.new('parent1', 'child1').etcd_key).to eq '/test/parent1/children/child1'
+    end
+
+    describe '#mkdir' do
+      it 'creates parent directory in etcd' do
+        expect(etcd).to receive(:set).with('/test/', dir: true, prevExist: false)
+
+        TestEtcdChild.mkdir()
+      end
+
+      it 'creates child directory in etcd' do
+        expect(etcd).to receive(:set).with('/test/parent/children/', dir: true, prevExist: false)
+
+        TestEtcdChild.mkdir('parent')
+      end
     end
 
     it 'lists recursively from etcd' do
