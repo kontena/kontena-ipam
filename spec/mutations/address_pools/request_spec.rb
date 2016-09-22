@@ -6,14 +6,6 @@ describe AddressPools::Request do
     )
   end
 
-  let :etcd do
-    spy()
-  end
-
-  before do
-    EtcdModel.etcd = $etcd = etcd
-  end
-
   describe '#validate' do
     it 'rejects a missing network' do
       subject = described_class.new(policy: policy)
@@ -70,14 +62,11 @@ describe AddressPools::Request do
       described_class.new(policy: policy, network: 'kontena')
     end
 
-    it 'returns subnets if they exists in etcd' do
-      expect(AddressPool).to receive(:list).and_return([
-          AddressPool.new("kontena", subnet: IPAddr.new("10.81.0.0/16")),
-      ])
+    it 'rejects an incorrect iprange' do
+      subject = described_class.new(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.80.0.0/24')
 
-      expect(subject.reserved_subnets).to eq [
-        IPAddr.new("10.81.0.0/16"),
-      ]
+      expect(subject).to have_errors
+      expect(subject.validation_outcome.errors.symbolic[:iprange]).to eq :out_of_pool
     end
   end
 
@@ -100,8 +89,7 @@ describe AddressPools::Request do
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
         expect(AddressPool).to receive(:list).with(no_args).and_return([])
         expect(policy).to receive(:allocate_subnets).and_yield(IPAddr.new('10.80.0.0/24'))
-        expect(AddressPool).to receive(:create).with('kontena', subnet: IPAddr.new('10.80.0.0/24'), iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/24')))
-        expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true)
+        expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.80.0.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/24')))
 
         outcome = subject.run
 
@@ -115,9 +103,7 @@ describe AddressPools::Request do
           AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')),
         ])
         expect(policy).to receive(:allocate_subnets).with([IPAddr.new('10.80.0.0/24')]).and_yield(IPAddr.new('10.80.1.0/24'))
-        expect(AddressPool).to receive(:create).with('kontena', subnet: IPAddr.new('10.80.1.0/24'), iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.1.0/24')))
-
-        expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true)
+        expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.80.1.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.1.0/24')))
 
         outcome = subject.run
 
@@ -195,8 +181,7 @@ describe AddressPools::Request do
         expect(AddressPool).to receive(:list).with(no_args).and_return([
           AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')),
         ])
-        expect(AddressPool).to receive(:create).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
-        expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true)
+        expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
 
         outcome = subject.run
 
@@ -208,6 +193,21 @@ describe AddressPools::Request do
     context 'allocating a static pool with an iprange' do
       let :subject do
         described_class.new(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.128.0/17')
+      end
+
+      let :pool do
+        AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.128.0/17'))
+      end
+
+      it 'creates the address pool with the ipragnge' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(AddressPool).to receive(:list).with(no_args).and_return([])
+        expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.128.0/17')).and_return(pool)
+
+        outcome = subject.run
+
+        expect(outcome).to be_success
+        expect(outcome.result).to eq pool
       end
 
       it 'fails if the network already exists with a different iprange' do
