@@ -11,6 +11,7 @@ end
 require_relative '../plugin'
 require_relative '../app/logging.rb'
 require 'webmock/rspec'
+require 'rack/test'
 
 log_target = ENV['LOG_TARGET'] || '/dev/null'
 Logging.initialize_logger(log_target, Logger::DEBUG)
