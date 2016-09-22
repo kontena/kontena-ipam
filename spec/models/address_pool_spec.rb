@@ -7,6 +7,13 @@ describe AddressPool do
     $etcd = EtcdModel.etcd = etcd
   end
 
+  it 'creates objects in etcd' do
+    expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
+    expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
+
+    expect(described_class.create('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"))
+  end
+
   it 'lists objects in etcd' do
     expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double(directory?: true, children: [
         double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
@@ -25,6 +32,35 @@ describe AddressPool do
     expect(described_class.get('kontena')).to eq(
       AddressPool.new("kontena", subnet: IPAddr.new("10.81.0.0/16")),
     )
+  end
+
+  describe '#create_or_get' do
+    it 'stores new object to etcd' do
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
+      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
+
+      expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"))
+    end
+
+    it 'loads existing object from etcd' do
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}').and_raise(Etcd::NodeExist)
+      expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(
+          double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.80.0.0/16"}'),
+      )
+
+      # yes, it returns with a different subnet
+      expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.80.0.0/16"))
+    end
+  end
+
+  it 'lists reserved subnets from etcd' do
+    expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double(directory?: true, children: [
+        double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
+    ]))
+
+    expect(described_class.reserved_subnets).to eq [
+      IPAddr.new("10.81.0.0/16"),
+    ]
   end
 
   context 'for a AddressPool' do
@@ -76,9 +112,16 @@ describe AddressPool do
         double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1"}'),
       ]))
 
-      expect(subject.reserved).to eq [
+      expect(subject.reserved_addresses).to eq [
         IPAddr.new('10.81.0.1'),
       ]
+    end
+
+    it 'deletes objects in etcd' do
+      expect(etcd).to receive(:delete).with('/kontena/ipam/pools/kontena')
+      expect(etcd).to receive(:delete).with('/kontena/ipam/addresses/kontena/', recursive: true)
+
+      subject.delete!
     end
   end
 
