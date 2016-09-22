@@ -65,7 +65,7 @@ describe Addresses::Request do
       it 'reserves given address if available' do
         addr = Address.new('kontena', '10.81.100.100', address: pool.subnet.subnet_addr('10.81.100.100'))
 
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.100.100')).and_return(addr)
+        expect(Address).to receive(:create).with('kontena', '10.81.100.100', address: IPAddr.new('10.81.100.100')).and_return(addr)
 
         outcome = subject.run
 
@@ -75,7 +75,7 @@ describe Addresses::Request do
       end
 
       it 'errors if given address conflicts' do
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.100.100')).and_return(nil)
+        expect(Address).to receive(:create).with('kontena', '10.81.100.100', address: IPAddr.new('10.81.100.100')).and_raise(Address::Conflict)
 
         outcome = subject.run
 
@@ -119,7 +119,7 @@ describe Addresses::Request do
 
         allow(pool).to receive(:reserved).and_return([]) # XXX: called twice?
         expect(policy).to receive(:allocate_address).with(subject.available_addresses).and_return(IPAddr.new('10.81.100.100'))
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.100.100')).and_return(addr)
+        expect(Address).to receive(:create).with('kontena', '10.81.100.100', address: IPAddr.new('10.81.100.100')).and_return(addr)
 
         outcome = subject.run
 
@@ -203,7 +203,7 @@ describe Addresses::Request do
 
         expect(pool).to receive(:reserved).and_return([])
         expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1'))
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.1')).and_return(addr)
+        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1')).and_return(addr)
 
         outcome = subject.run
 
@@ -217,7 +217,7 @@ describe Addresses::Request do
 
         expect(pool).to receive(:reserved).and_return(reserved)
         expect(policy).to receive(:allocate_address).with(available).and_return(IPAddr.new('10.81.1.1'))
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.1')).and_return(addr)
+        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1')).and_return(addr)
 
         outcome = subject.run
 
@@ -236,16 +236,16 @@ describe Addresses::Request do
         expect(outcome.errors.symbolic[:address]).to eq :allocate
       end
 
-      it 'retries allocation if reservation fails' do
+      it 'retries allocation on address conflict' do
         addr = Address.new('kontena', '10.81.1.2', address: pool.subnet.subnet_addr('10.81.1.2'))
 
         expect(pool).to receive(:reserved).and_return([])
         expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1'))
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.1')).and_return(nil)
+        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1')).and_raise(Address::Conflict)
 
         expect(pool).to receive(:reserved).and_return([IPAddr.new('10.81.1.1')])
         expect(policy).to receive(:allocate_address).with(addresses - [IPAddr.new('10.81.1.1')]).and_return(IPAddr.new('10.81.1.2'))
-        expect(pool).to receive(:create_address).with(IPAddr.new('10.81.1.2')).and_return(addr)
+        expect(Address).to receive(:create).with('kontena', '10.81.1.2', address: IPAddr.new('10.81.1.2')).and_return(addr)
 
         outcome = subject.run
 
