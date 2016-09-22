@@ -9,6 +9,5 @@ end
 Logging.initialize_logger(STDOUT, log_level)
 
 IpamPlugin.policy = Policy.new(ENV)
-IpamPlugin.ensure_keys
 
 run IpamPlugin
