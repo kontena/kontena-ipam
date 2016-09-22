@@ -67,7 +67,7 @@ describe JSONModel do
   end
 
   it 'encodes to json with type value #to_json' do
-   expect(JSON.parse(TestJSON.new(ipaddr: IPAddr.new("127.0.0.1")).to_json)).to eq({'bool' => false, 'ipaddr' => "127.0.0.1/32"})
+   expect(JSON.parse(TestJSON.new(ipaddr: IPAddr.new("127.0.0.1")).to_json)).to eq({'bool' => false, 'ipaddr' => "127.0.0.1"})
  end
 
   it 'decodes from json with default values' do
@@ -86,6 +86,9 @@ describe JSONModel do
 
   it 'decodes with type' do
     expect(TestJSON.from_json('{"ipaddr": "127.0.0.1"}')).to eq TestJSON.new(ipaddr: IPAddr.new("127.0.0.1"))
+    expect(TestJSON.from_json('{"ipaddr": "127.0.0.1/8"}')).to eq TestJSON.new(ipaddr: IPAddr.new("127.0.0.1/8"))
+    expect(TestJSON.from_json('{"ipaddr": "127.0.0.1/8"}').ipaddr.to_cidr).to eq "127.0.0.1/8"
+
   end
 
   it 'ignores unknown attributes' do

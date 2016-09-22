@@ -1,15 +1,15 @@
 module AddressPools
-  class SubnetAllocationError < StandardError
-
+  class SubnetError < RuntimeError
+    attr_reader :sym
+    def initialize(sym)
+      @sym = sym
+    end
   end
-  class SubnetMismatchError < SubnetAllocationError
-
-  end
-  class SubnetConflictError < SubnetAllocationError
-
-  end
-  class SubnetExhaustionError < SubnetAllocationError
-
+  class IPRangeError < RuntimeError
+    attr_reader :sym
+    def initialize(sym)
+      @sym = sym
+    end
   end
 
   class Request < Mutations::Command
@@ -22,12 +22,12 @@ module AddressPools
 
     optional do
       string :subnet, discard_empty: true
+      string :iprange, discard_empty: true
     end
 
     def validate
-      @subnet = IPAddr.new(subnet) if subnet_present?
-    rescue IPAddr::InvalidAddressError => e
-      add_error(:subnet, :invalid, e.message)
+      @subnet = IPAddr.new(subnet) if subnet_present? rescue add_error(:subnet, :invalid, "Invalid address")
+      @iprange = IPAddr.new(iprange) if iprange_present? rescue add_error(:iprange, :invalid, "Invalid address")
     end
 
     def execute
@@ -36,7 +36,11 @@ module AddressPools
 
         # existing network created on a remote node
         if subnet && pool.subnet != subnet
-          raise SubnetMismatchError, "network #{network} already exists with subnet #{pool.subnet}, asked for #{subnet}"
+          raise SubnetError.new(:config), "network #{network} already exists with subnet #{pool.subnet}, requested #{@subnet}"
+        end
+
+        if iprange && pool.iprange != iprange
+          raise IPRangeError.new(:config), "network #{network} already exists with iprange #{pool.iprange}, requested #{@iprange}"
         end
 
         return pool
@@ -45,7 +49,7 @@ module AddressPools
 
         # statically allocated network
         if conflict = reserved_subnets.find { |s| s if s.include?(@subnet) || @subnet.include?(s) }
-          raise SubnetConflictError, "#{subnet} conflict with #{conflict.to_cidr}"
+          raise SubnetError.new(:conflict), "#{subnet} conflict with #{conflict.to_cidr}"
         end
 
         return pool if pool = reserve_pool(@subnet)
@@ -63,14 +67,12 @@ module AddressPools
           fail "concurrent network create"
         end
 
-        raise SubnetExhaustionError, "supernet #{policy.supernet} is exhausted"
+        raise SubnetError.new(:allocate), "supernet #{policy.supernet} is exhausted"
       end
-    rescue SubnetMismatchError => e
-      add_error(:subnet, :mismatch, e.message)
-    rescue SubnetConflictError => e
-      add_error(:subnet, :conflict, e.message)
-    rescue SubnetAllocationError => e
-      add_error(:subnet, :allocate, e.message)
+    rescue SubnetError => error
+      add_error(:subnet, error.sym, error.message)
+    rescue IPRangeError => error
+      add_error(:iprange, error.sym, error.message)
     end
 
     # Returns currently allocated subnets.
@@ -91,6 +93,7 @@ module AddressPools
     def reserve_pool(subnet)
       pool = AddressPool.create(network,
         subnet: subnet,
+        iprange: @iprange,
       )
 
       if pool

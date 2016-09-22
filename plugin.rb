@@ -83,6 +83,7 @@ class IpamPlugin < Sinatra::Application
       policy: policy,
       network: params.dig('Options', 'network'),
       subnet: params['Pool'],
+      iprange: params['SubPool'],
     )
 
     json(
@@ -94,12 +95,13 @@ class IpamPlugin < Sinatra::Application
 
   post '/IpamDriver.RequestAddress' do
     address = Addresses::Request.run!(
+      policy: policy,
       pool_id: params['PoolID'],
       address: params['Address'],
     )
 
     json(
-      'Address' => address,
+      'Address' => address.address.to_cidr,
       'Data'    => {},
     )
   end

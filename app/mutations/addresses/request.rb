@@ -2,13 +2,22 @@ require 'ipaddr'
 
 module Addresses
   class Request < Mutations::Command
-    class PoolError < StandardError
-
+    class AddressError < RuntimeError
+      attr_reader :sym
+      def initialize(sym)
+        @sym = sym
+      end
+    end
+    class AddressConflict < AddressError
+      def sym
+        :conflict
+      end
     end
 
     include Logging
 
     required do
+      model :policy
       string :pool_id
     end
 
@@ -18,86 +27,82 @@ module Addresses
 
     def validate
       @address = IPAddr.new(self.address) if self.address_present?
-      @pool = AddressPool.get(pool_id)
 
-      raise PoolError, "Pool not found: #{pool_id}" unless @pool
-
-      if @address
-        add_error(:address, :out_of_pool,
-          "Given address not within pool") unless @pool.subnet.include?(@address)
+      unless @pool = AddressPool.get(pool_id)
+        add_error(:pool, :not_found, "Pool not found: #{pool_id}")
       end
-    rescue IPAddr::InvalidAddressError => e
-      add_error(:address, :invalid, e.message)
-    rescue PoolError => e
-      add_error(:pool_id, :not_found, e.message)
+
+      if @address && @pool
+        unless @pool.subnet.include?(@address)
+          add_error(:address, :out_of_pool, "Address #{@address} outside of pool subnet #{@pool.subnet}")
+        end
+      end
+    rescue IPAddr::InvalidAddressError => error
+      add_error(:address, :invalid, error.message)
+    end
+
+    # Compute available addresses for allocation within pool
+    #
+    # @return [Array<IPAddr>]
+    def available_addresses
+      allocatable = @pool.allocatable
+      reserved = @pool.reserved
+      addresses = allocatable.list_hosts(exclude: IPSet.new(reserved))
+
+      info "pool #{@pool} allocates from #{allocatable.to_cidr} and has #{reserved.length} reserved + #{addresses.length} available addresses"
+
+      addresses
     end
 
     def execute
-      info "requesting address(#{@address}) in pool: #{@pool.subnet}"
-      addresses = available_addresses
-      info "available addresses: (#{self.pool_id}): #{addresses.size}"
-      ip = nil
       if @address
-        if addresses.include?(@address)
-          ip = @address
-        else
-          add_error(:address, :not_available, 'Given address not available')
-          return
-        end
+        info "request static address #{@address} in pool #{@pool.id} with subnet #{@pool.subnet}"
+
+        request_static
       else
-        if addresses.size > 100
-          ip = addresses[rand(0..100)]
-        else
-          ip = addresses[0]
-        end
+        info "request dynamic address in pool #{@pool.id} with subnet #{@pool.subnet}"
+
+        request_dynamic
+      end
+    rescue AddressError => error
+      add_error(:address, error.sym, error.message)
+    end
+
+    # Allocate static @address within @pool.
+    #
+    # @raise AddressError if reservation failed (conflict)
+    # @return [Address] reserved address
+    def request_static
+      # reserve
+      unless address = @pool.create_address(@address)
+        raise AddressConflict, "Allocation conflict for address #{@address}"
       end
 
-      if ip
-        etcd.set("/kontena/ipam/addresses/#{self.pool_id}/#{ip.to_s}", value: ip.to_s)
-      else
-        add_error(:address, :cannot_allocate, 'Cannot allocate ip, address pool is full')
-        return
+      return address
+    end
+
+    # Allocate dynamic address within @pool.
+    # Retries allocation on AddressConflict
+    #
+    # @raise AddressError if allocation failed (pool is full)
+    # @return [Address] reserved address
+    def request_dynamic
+      # allocate
+      unless allocate_address = policy.allocate_address(available_addresses)
+        raise AddressError.new(:allocate), "No addresses available for allocation"
       end
 
-      "#{ip.to_s}/#{@pool.subnet.length}"
-    end
-
-    # @return [Array<IPAddr>]
-    def available_addresses
-      reserved = reserved_addresses
-      address_pool.reject { |a| reserved.include?(a)}
-    end
-
-    # @return [Array<IPAddr>]
-    def address_pool
-      unless self.class.pools[@pool.subnet]
-        if self.pool_id == 'kontena'
-          # In the default kontena network, skip first /24 block for weave expose
-          self.class.pools[@pool.subnet] = @pool.subnet.to_range.to_a[256...-1]
-        else
-          self.class.pools[@pool.subnet] = @pool.subnet.to_range.to_a[1...-1]
-        end
+      # reserve
+      unless address = @pool.create_address(allocate_address)
+        raise AddressConflict, "Concurrent allocation for address #{allocate_address}"
       end
-      self.class.pools[@pool.subnet]
-    end
 
-    # @return [Array<IPAddr>]
-    def reserved_addresses
-      reserved_addresses = []
-      response = etcd.get("/kontena/ipam/addresses/#{self.pool_id}/")
-      response.children.map{|c|
-        reserved_addresses << IPAddr.new(c.value)
-      }
-      reserved_addresses
-    end
+      return address
+    rescue AddressConflict => error
+      warn "retry dynamic address allocation: #{error.message}"
 
-    # @return [Etcd::Client]
-    def etcd
-      $etcd
-    end
-
-    def self.pools
-      @pools ||= {}
+      # should make progress given that we refresh the set of reserved addresses, and raise a different error if the pool is full
+      retry
     end
   end
 end

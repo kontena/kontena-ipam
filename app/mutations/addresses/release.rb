@@ -5,23 +5,33 @@ module Addresses
     include Logging
 
     required do
-      string :address
       string :pool_id
+      string :address
     end
 
     def validate
-      resp = etcd.get("/kontena/ipam/pools/#{self.pool_id}") rescue nil
-      add_error(:error, :not_found, 'Pool not found') if resp.nil?
+      @address = IPAddr.new(self.address)
+
+      unless @pool = AddressPool.get(self.pool_id)
+        add_error(:pool_id, :not_found, "AddressPool not found: #{self.pool_id}")
+      end
+
+      if @address && @pool
+        unless @pool.subnet.include?(@address)
+          add_error(:address, :out_of_pool, "Address #{@address} outside of pool subnet #{@pool.subnet}")
+        end
+      end
+
+    rescue IPAddr::InvalidAddressError => e
+      add_error(:address, :invalid, e.message)
     end
 
     def execute
-      info "releasing address: #{self.address} in pool: #{self.pool_id}"
-      etcd.delete("/kontena/ipam/addresses/#{self.pool_id}/#{self.address}")
-    end
+      info "releasing address: #{@address} in pool: #{@pool_id}"
 
-    # @return [Etcd::Client]
-    def etcd
-      $etcd
+      if address = @pool.get_address(@address)
+        address.delete!
+      end
     end
   end
 end

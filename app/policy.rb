@@ -49,4 +49,19 @@ class Policy
     end
     return nil
   end
+
+  # Allocate an IP address from within the given set of available addresses.
+  # Returns nil if no available addresses
+  #
+  # @param addresses [Array<IPAddr>] available host addresses
+  # @return [IPAddr] or nil
+  def allocate_address(addresses)
+    if addresses.empty?
+      nil
+    elsif addresses.size > 100
+      addresses[rand(0..100)]
+    else
+      addresses[0]
+    end
+  end
 end
