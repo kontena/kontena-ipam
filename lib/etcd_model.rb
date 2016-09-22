@@ -17,6 +17,11 @@ module EtcdModel
     @@etcd
   end
 
+  # Set operation failed with a conflict
+  class Conflict < StandardError
+
+  end
+
   # A structured etcd key path, consisting of String and Symbol components.
   #
   # @attr_reader path [Array<String, Symbol>] normalized path components, which are path-component strings, or symbols for instance variables
@@ -196,16 +201,18 @@ module EtcdModel
 
     public
 
-    # Create and return new object in etcd, or nil if already exists
+    # Create and return new object in etcd, or raise Conflict if already exists
     #
-    # @param name [String] object key name
-    # @return [EtcdModel] new instance, or nil if exists
+    # @param key [Array<String>] object key values
+    # @param opts [Hash<String, Object>] object attribute values
+    # @raise [Conflict] object already exists
+    # @return [EtcdModel] stored instance
     def create(*key, **opts)
       object = new(*key, **opts)
       object.create!
       object
-    rescue Etcd::NodeExist
-      nil
+    rescue Etcd::NodeExist => error
+      raise const_get(:Conflict), "Create conflict with #{error.cause}@#{error.index}: #{error.message}"
     end
 
     # Return object from etcd, or nil if not exists
@@ -218,6 +225,27 @@ module EtcdModel
       object
     rescue Etcd::KeyNotFound
       nil
+    end
+
+    # Create and return new object in etcd, or return existing object.
+    #
+    # The returned object is guaranteed to have the same key values, but may have different attribute values.
+    #
+    # @param key [Array<String>] object key values
+    # @param opts [Hash<String, Object>] object attribute values
+    # @raise [Conflict] if the create races with a delete
+    # @return [EtcdModel] stored instance
+    def create_or_get(*key, **attrs)
+      begin
+        object = new(*key, **attrs)
+        object.create!
+        object
+      rescue Etcd::NodeExist => error
+        object.get!
+        object
+      end
+    rescue Etcd::KeyNotFound
+      raise const_get(:Conflict), "Create-and-Delete conflict with #{error.cause}@#{error.index}: #{error.message}"
     end
 
     # Iterate over all etcd objects under the given (partial) key prefix
@@ -276,6 +304,9 @@ module EtcdModel
 
   def self.included(base)
     base.extend(ClassMethods)
+
+    # define per-model Errors
+    base.const_set :Conflict, Class.new(EtcdModel::Conflict)
   end
 
   # Initialize from etcd key values and JSON attrs
@@ -313,6 +344,8 @@ module EtcdModel
   # Get this objcet from etcd.
   #
   # Updates all JSON attribute values.
+  #
+  # @raise Etcd::KeyNotFound
   def get!
     from_json!(etcd.get(etcd_key).value)
   end

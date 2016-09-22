@@ -107,16 +107,55 @@ describe EtcdModel do
       end
     end
 
-    it 'gets from etcd' do
-      expect(etcd).to receive(:get).with('/test/test1').and_return(double(value: '{"field":"value"}'))
+    describe '#get' do
+      it 'returns nil if missing from etcd' do
+        expect(etcd).to receive(:get).with('/test/test1').and_raise(Etcd::KeyNotFound)
 
-      expect(TestEtcd.get('test1')).to eq TestEtcd.new('test1', field: "value")
+        expect(TestEtcd.get('test1')).to be_nil
+      end
+
+      it 'returns object loaded from etcd' do
+        expect(etcd).to receive(:get).with('/test/test1').and_return(double(value: '{"field":"value"}'))
+
+        expect(TestEtcd.get('test1')).to eq TestEtcd.new('test1', field: "value")
+      end
     end
 
-    it 'creates in etcd' do
-      expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value"}')
+    describe '#create' do
+      it 'returns new object stored to etcd' do
+        expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value"}')
 
-      expect(TestEtcd.create('test1', field: "value")).to eq TestEtcd.new('test1', field: "value")
+        expect(TestEtcd.create('test1', field: "value")).to eq TestEtcd.new('test1', field: "value")
+      end
+
+      it 'raises conflict if object exists in etcd' do
+        expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value"}').and_raise(Etcd::NodeExist)
+
+        expect{TestEtcd.create('test1', field: "value")}.to raise_error(TestEtcd::Conflict)
+      end
+    end
+
+    describe '#create_or_get' do
+      it 'returns new object stored to etcd' do
+        expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value"}')
+
+        expect(TestEtcd.create_or_get('test1', field: "value")).to eq TestEtcd.new('test1', field: "value")
+      end
+
+      it 'returns existing object loaded from etcd' do
+        expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value 1"}').and_raise(Etcd::NodeExist)
+        expect(etcd).to receive(:get).with('/test/test1').and_return(double(value: '{"field":"value 2"}'))
+
+        expect(TestEtcd.create_or_get('test1', field: "value 1")).to eq TestEtcd.new('test1', field: "value 2")
+      end
+
+      it 'raises conflict if the world is a scary place' do
+        # this is a create vs delete race
+        expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value"}').and_raise(Etcd::NodeExist)
+        expect(etcd).to receive(:get).with('/test/test1').and_raise(Etcd::KeyNotFound)
+
+        expect{TestEtcd.create_or_get('test1', field: "value")}.to raise_error(TestEtcd::Conflict)
+      end
     end
 
     it 'lists from etcd' do
