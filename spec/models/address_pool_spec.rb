@@ -4,7 +4,7 @@ describe AddressPool do
   end
 
   before do
-    $etcd = EtcdModel.etcd = etcd
+    EtcdModel.etcd = etcd
   end
 
   it 'creates objects in etcd' do
