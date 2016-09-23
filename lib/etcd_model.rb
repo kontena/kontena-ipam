@@ -116,26 +116,32 @@ module EtcdModel
       '/' + path.join('/')
     end
 
-    # Returns as much of the leading path as possible, for the given number of keys
+    # Returns as much of the leading path as possible, for the given number of keys.
+    # If the full set if keys is given, returns a full path.
+    # If a partial set of keys is given, returns a directory path ending in /
     #
     # @param key [String] key values, may be shorter than the full key
     # @raise ArgumentError if an invalid key value is given, or if too many keys are given
-    # @return [String] etcd path
+    # @return [String] etcd path, ending in / for a partial prefix
     def prefix(*key)
       path = []
+      partial = false
 
       for part in @path
         if part.is_a? String
           path << part
         elsif part.is_a? Symbol
-          break if key.empty?
+          if key.empty?
+            partial = true
+            break
+          else
+            part = key.shift
 
-          part = key.shift
+            # guard against accidential broad prefixes
+            raise ArgumentError, "Invalid key prefix value: #{part}" if part.nil? || part.empty?
 
-          # guard against accidential broad prefixes
-          raise ArgumentError, "Invalid key prefix value: #{part}" if part.nil? || part.empty?
-
-          path << part
+            path << part
+          end
         else
           raise "Invalid path part: #{part}"
         end
@@ -143,7 +149,11 @@ module EtcdModel
 
       raise ArgumentError, "Etcd key is too long" if !key.empty?
 
-      '/' + path.join('/') + '/'
+      if partial
+        '/' + path.join('/') + '/'
+      else
+        '/' + path.join('/')
+      end
     end
 
     # Parse key values from full etcd path
@@ -210,6 +220,8 @@ module EtcdModel
     # @param key [String] key values
     def mkdir(*key)
       prefix = @etcd_schema.prefix(*key)
+
+      raise ArgumentError, "mkdir for complete object key" unless prefix.end_with? '/'
 
       etcd.set(prefix, dir: true, prevExist: false)
     rescue Etcd::NodeExist => errors
@@ -314,7 +326,7 @@ module EtcdModel
     def delete(*key)
       prefix = @etcd_schema.prefix(*key)
 
-      etcd.delete(prefix, recursive: true)
+      etcd.delete(prefix, recursive: prefix.end_with?('/'))
     end
   end
 
