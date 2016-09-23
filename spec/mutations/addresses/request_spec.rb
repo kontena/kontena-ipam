@@ -129,7 +129,7 @@ describe Addresses::Request do
       end
 
       it 'errors if the pool is full' do
-        expect(pool).to receive(:reserved_addresses).and_return(pool.subnet.list_hosts)
+        expect(pool).to receive(:reserved_addresses).and_return(pool.subnet.hosts.to_a)
         expect(policy).to receive(:allocate_address).with([]).and_return(nil)
 
         outcome = subject.run
