@@ -31,23 +31,13 @@ class Policy
     raise ArgumentError, 'Invalid subnet length' unless @subnet_length.between?(0, 32)
   end
 
-  # Yields subnets of the configured length within the supernet, avoiding any
+  # Enumerate allocatable subnets of the configured length within the supernet, avoiding any
   # overlap with the given reserved subnets.
   #
-  # @param reserved_subnets [Array<IPAddr>] existing subnets
-  # @yield [subnet]
-  # @yieldparam subnet [IPAddr] new subnet
-  def allocate_subnets(reserved_subnets)
-    supernet.each_subnet(subnet_length) do |subnet|
-      yield subnet unless reserved_subnets.any? { |s| s.include?(subnet) || subnet.include?(s) }
-    end
-  end
-
-  def allocate_subnet(reserved_subnets)
-    allocate_subnets(reserved_subnets) do |subnet|
-      return subnet
-    end
-    return nil
+  # @param reserved [IPSet] existing subnets
+  # @return [Enumerator<IPAddr>]
+  def allocatable_subnets(reserved)
+    supernet.subnets(subnet_length, exclude: reserved)
   end
 
   # Allocate an IP address from within the given set of available addresses.
