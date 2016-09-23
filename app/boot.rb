@@ -13,6 +13,7 @@ require_relative '../lib/etcd/keys_helpers'
 require_relative '../lib/etcd_model'
 
 require_relative 'logging'
+require_relative 'etcd_client'
 require_relative 'policy'
 require_relative 'models/address_pool'
 require_relative 'models/address'
