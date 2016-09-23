@@ -29,7 +29,7 @@ describe IPAddr do
       expect(JSON.dump('test' => IPAddr.new('10.80.1.0/24'))).to eq '{"test":"10.80.1.0/24"}'
     end
     it 'encodes network addresses to JSON' do
-      expect(JSON.dump('test' => IPAddr.new('10.80.1.0/24').list_hosts.first)).to eq '{"test":"10.80.1.1/24"}'
+      expect(JSON.dump('test' => IPAddr.new('10.80.1.0/24').hosts.first)).to eq '{"test":"10.80.1.1/24"}'
     end
     it 'encodes host addresses to JSON' do
       expect(JSON.dump('test' => IPAddr.new('10.80.1.1'))).to eq '{"test":"10.80.1.1"}'
@@ -89,33 +89,40 @@ describe IPAddr do
     end
 
     it 'lists the host addresses' do
-      hosts = subject.list_hosts
+      hosts = subject.hosts
 
       expect(hosts.first).to eq '192.0.2.1'
       expect(hosts.first).to_not be_host
       expect(hosts.first.to_cidr).to eq '192.0.2.1/24'
-      expect(hosts).to eq((1..254).map{|i| IPAddr.new("192.0.2.#{i}")})
+      expect(hosts.to_a).to eq((1..254).map{|i| IPAddr.new("192.0.2.#{i}")})
     end
 
     it 'lists the host from an offset' do
-      hosts = subject.list_hosts offset: 100
+      hosts = subject.hosts(offset: 100)
 
       expect(hosts.first.to_cidr).to eq '192.0.2.100/24'
-      expect(hosts).to eq((100..254).map{|i| IPAddr.new("192.0.2.#{i}")})
+      expect(hosts.to_a).to eq((100..254).map{|i| IPAddr.new("192.0.2.#{i}")})
     end
 
     it 'lists the host addresses with an IPSet exclude' do
       excludes = [20, 10, 11]
       exclude_addrs = excludes.map{|i| IPAddr.new("192.0.2.#{i}")}
 
-      hosts = subject.list_hosts exclude: IPSet.new(exclude_addrs)
+      hosts = subject.hosts(exclude: IPSet.new(exclude_addrs))
 
+      expect(hosts.first).to_not be_nil
       expect(hosts.first.to_cidr).to eq '192.0.2.1/24'
-      expect(hosts).to eq((1..254).map { |i|
+      expect(hosts.to_a).to eq((1..254).map { |i|
         next if excludes.include? i
 
         IPAddr.new("192.0.2.#{i}")
       }.compact)
+    end
+
+    it 'iterates over the supernets' do
+      expect(subject.supernets.first).to eq IPAddr.new('192.0.2.0/23')
+      expect(subject.supernets.to_a).to eq((0...24).map{|i| IPAddr.new("192.0.2.0").mask(i)}.reverse)
+      expect(subject.supernets.to_a.last).to eq IPAddr.new('0.0.0.0/0')
     end
   end
 
@@ -146,12 +153,12 @@ describe IPAddr do
     end
 
     it 'generates big subnets' do
-      expect{|block| supernet.each_subnet(14, &block)}.to yield_successive_args(
+      expect(supernet.subnets(14).to_a).to eq [
         IPAddr.new('10.80.0.0/14'),
         IPAddr.new('10.84.0.0/14'),
         IPAddr.new('10.88.0.0/14'),
         IPAddr.new('10.92.0.0/14'),
-      )
+      ]
     end
 
     it 'generates small subnets' do
@@ -162,7 +169,20 @@ describe IPAddr do
         end
       end
 
-      expect{|block| supernet.each_subnet(24, &block)}.to yield_successive_args(*subnets)
+      expect(supernet.subnets(24).to_a).to eq subnets
+    end
+
+    it 'generates subnets excluding given sparse IPSet' do
+      exclude = IPSet.new([IPAddr.new('10.81.1.0/24')])
+      expect(supernet.subnets(14, exclude: exclude).to_a).to eq [
+        IPAddr.new('10.84.0.0/14'),
+        IPAddr.new('10.88.0.0/14'),
+        IPAddr.new('10.92.0.0/14'),
+      ]
+    end
+
+    it 'fails to generate subnets if the exclude is not an IPSet' do
+      expect{supernet.subnets(24, exclude: [IPAddr.new('10.80.0.64/28')])}.to raise_error(ArgumentError, "Exclude must be an IPSet, not a Array")
     end
   end
 
@@ -185,12 +205,12 @@ describe IPAddr do
     end
 
     it 'generates big subnets' do
-      expect{|block| supernet.each_subnet(50, &block)}.to yield_successive_args(
+      expect(supernet.subnets(50).to_a).to eq [
         IPAddr.new('fd00:ecec:0:0000::/50'),
         IPAddr.new('fd00:ecec:0:4000::/50'),
         IPAddr.new('fd00:ecec:0:8000::/50'),
         IPAddr.new('fd00:ecec:0:c000::/50'),
-      )
+      ]
     end
   end
 end

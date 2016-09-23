@@ -2,6 +2,8 @@
 #
 # Members can be networks, and you can test for network membership, including overlapping and underlapping networks.
 class IPSet
+  attr_reader :addrs
+  
   # Initialize for given IPAddrs.
   #
   # @param addrs [Array<IPAddr>]

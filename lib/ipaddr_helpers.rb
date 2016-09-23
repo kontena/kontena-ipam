@@ -86,24 +86,31 @@ class IPAddr
       mask(length) | (offset << (self.maxlength - length))
     end
 
-    # Yield each of the subnets of a given length within this larger supernet.
+    # Enumerate the subnets of a given length within this larger supernet.
     #
-    # IPAddr.new('10.80.0.0/16').each_subnet(24) { |subnet| puts subnet }
+    # IPAddr.new('10.80.0.0/16').subnets(24).each { |subnet| puts subnet }
     #   10.80.0.0/24
     #   10.80.1.0/24
     #   ...
     #   10.80.255.0/24
     #
     # @param length [Integer] desired subnet prefix length
-    # @yield [subnet] iterate over the subnets
-    # @yieldparam subnet [IPAddr] smaller subnet within this supernet
-    def each_subnet (length)
+    # @param exclude [IPSet] exclude other IPAddrs
+    # @return [Enumerator<IPAddr>] enumerate IPAddr
+    def subnets(length, exclude: nil)
       raise ArgumentError, 'Short subnet prefix' if length < self.length
+      raise ArgumentError, "Exclude must be an IPSet, not a #{exclude.class}" if exclude unless exclude.is_a? IPSet
 
       subnet_count = 2 ** (length - self.length)
 
-      for i in 0...subnet_count
-        yield subnet(length, i)
+      Enumerator.new do |y|
+        for i in 0...subnet_count
+          s = subnet(length, i)
+
+          next if exclude && exclude.include?(s)
+
+          y << s
+        end
       end
     end
 
@@ -156,30 +163,24 @@ class IPAddr
       @addr & _hostmask
     end
 
-    # Yield each of the subnet addresses.
+    # Enumerate the subnet addresses within this network.
+    #
     # Optionally skip the first offset addresses.
-    # The addr is yielded as a subnet addr with the subnet mask.
+    # The addr is yielded as a subnet addr with a subnet mask and host bits set.
     #
     # @param offset [Integer] skip the first N addresses
     # @param exclude [IPSet] exclude specific addresses
-    # @yield [addr]
-    # @yieldparam addr [IPAddr] host address with the subnet mask
-    def each_host(offset: nil, exclude: nil)
-      for addr in to_range
-        next if addr.network? || addr.broadcast?
-        next if offset && addr.host_offset < offset
-        next if exclude && (exclude.include? addr)
+    # @return [Enumerator<IPAddr>]
+    def hosts(offset: nil, exclude: nil)
+      Enumerator.new do |y|
+        for addr in to_range
+          next if addr.network? || addr.broadcast?
+          next if offset && addr.host_offset < offset
+          next if exclude && (exclude.include? addr.to_host)
 
-        yield addr
+          y << addr
+        end
       end
-    end
-
-    def list_hosts(**opts)
-      hosts = []
-      each_host(**opts) do |host|
-        hosts << host
-      end
-      hosts
     end
 
     # Return the given host addr within this subnet, with the subnet mask.
@@ -193,5 +194,19 @@ class IPAddr
       raise ArgumentError, "Host address #{addr} outside of subnet #{self}" unless self.include? addr
 
       return clone.set(addr.to_i)
+    end
+
+    # Yield each of the higher networks that contains this subnet.
+    #
+    # For example, IPAddr.new('192.0.2.0/24').supernets would yield 192.0.2.0/23, 192.0.0.0/22, ..., 0.0.0.0/0.
+    #
+    # @yield [supernet]
+    # @yieldparam supernet [IPAddr] a larger network containing this network
+    def supernets
+      Enumerator.new do |y|
+        (0...length).reverse_each do |super_length|
+          y << mask(super_length)
+        end
+      end
     end
 end
