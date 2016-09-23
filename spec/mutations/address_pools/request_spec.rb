@@ -1,9 +1,14 @@
 describe AddressPools::Request do
   let :policy do
-    Policy.new(
-      'KONTENA_IPAM_SUPERNET' => '10.80.0.0/12',
-      'KONTENA_IPAM_SUBNET_LENGTH' => '24',
+    double(:policy,
+      supernet: IPAddr.new('10.80.0.0/16'),
     )
+  end
+
+  before do
+    allow(policy).to receive(:is_a?).with(Hash).and_return(false)
+    allow(policy).to receive(:is_a?).with(Array).and_return(false)
+    allow(policy).to receive(:is_a?).with(Policy).and_return(true)
   end
 
   describe '#validate' do

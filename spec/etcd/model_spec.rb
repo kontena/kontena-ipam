@@ -44,7 +44,7 @@ describe EtcdModel do
   end
 
   let :etcd do
-    etcd = double()
+    etcd = double(:etcd)
   end
 
   before do

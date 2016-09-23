@@ -1,6 +1,6 @@
 describe AddressPool do
   let :etcd do
-    spy()
+    double(:etcd)
   end
 
   before do

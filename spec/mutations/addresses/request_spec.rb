@@ -1,6 +1,6 @@
 describe Addresses::Request do
   let :policy do
-    double()
+    double(:policy)
   end
 
   before do
