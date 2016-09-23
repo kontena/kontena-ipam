@@ -21,28 +21,34 @@ module Logging
     Logging.logger
   end
 
+  # Prefix for log messages, defaults to class name
+  #
+  # @return [String]
+  def logging_prefix
+    self.class.name
+  end
+
   # Send a debug message
-  # @param [String] string
-  def debug(string)
-    logger.debug(self.class.name.gsub('Kontena::', '')) { string }
+  # @param message [String]
+  def debug(message = nil, &block)
+    logger.add(Logger::DEBUG, message, logging_prefix, &block)
   end
 
   # Send a info message
-  # @param [String] string
-  def info(string)
-    logger.info(self.class.name) { string }
+  # @param message [String]
+  def info(message = nil, &block)
+    logger.add(Logger::INFO, message, logging_prefix, &block)
   end
 
   # Send a warning message
-  # @param [String] string
-  def warn(string)
-    logger.warn(self.class.name) { string }
+  # @param message [String]
+  def warn(message = nil, &block)
+    logger.add(Logger::WARN, message, logging_prefix, &block)
   end
 
   # Send an error message
-  # @param [String] string
-  def error(string)
-    logger.error(self.class.name) { string }
+  # @param message [String]
+  def error(message = nil, &block)
+    logger.add(Logger::ERROR, message, logging_prefix, &block)
   end
 end
-
