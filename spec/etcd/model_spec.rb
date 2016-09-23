@@ -180,8 +180,13 @@ describe EtcdModel do
       expect(TestEtcd.list()).to eq [
         TestEtcd.new('test1', field: "value 1"),
         TestEtcd.new('test2', field: "value 2"),
-
       ]
+    end
+
+    it 'lists empty if directory is missing in etcd' do
+      expect(etcd).to receive(:get).with('/test/').and_raise(Etcd::KeyNotFound)
+
+      expect(TestEtcd.list()).to eq []
     end
 
     it 'deletes instance from etcd' do

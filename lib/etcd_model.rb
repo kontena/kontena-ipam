@@ -276,12 +276,7 @@ module EtcdModel
       raise const_get(:Conflict), "Create-and-Delete conflict with #{error.cause}@#{error.index}: #{error.message}"
     end
 
-    # Iterate over all etcd objects under the given (partial) key prefix
-    #
-    # @param key [String] key values
-    # @yield [object]
-    # @yieldparam object [EtcdModel]
-    def each(*key, &block)
+    def _enumerate(y, key)
       prefix = @etcd_schema.prefix(*key)
       response = etcd.get(prefix)
 
@@ -290,14 +285,35 @@ module EtcdModel
         node_key = key + [name]
 
         if node.directory?
-          each(*node_key, &block)
+          _enumerate(y, node_key)
         else
           object = new(*node_key)
           object.from_json!(node.value)
 
-          yield object
+          y << object
         end
       end
+    rescue Etcd::KeyNotFound
+      # directory does not exist, it is empty
+    end
+
+    # Recursively enumerate all etcd objects under the given (partial) key prefix.
+    #
+    # Considers the directory to be empty if it does not exist.
+    #
+    def objects(*key)
+      Enumerator.new do |y|
+        _enumerate(y, key)
+      end
+    end
+
+    # Iterate over all objects under the given (partial) key prefix
+    #
+    # @param key [String] key values
+    # @yield [object]
+    # @yieldparam object [EtcdModel]
+    def each(*key)
+      objects(*key).each
     end
 
     # List all objects under the given (partial) key prefix
@@ -305,13 +321,7 @@ module EtcdModel
     # @param key [String] key values
     # @return [Array<EtcdModel>]
     def list(*key)
-      objects = []
-
-      each(*key) do |object|
-        objects << object
-      end
-
-      objects
+      objects(*key).to_a
     end
 
     # Delete all objects under the given (partial) key prefix.
