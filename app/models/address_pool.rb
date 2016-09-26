@@ -68,8 +68,8 @@ class AddressPool
 
   # Return the set of reserved IP addresses from etcd.
   #
-  # @return [Array<IPAddr>]
+  # @return [IPSet]
   def reserved_addresses
-    list_addresses.map{|a| a.address }
+    IPSet.new(list_addresses.map{|a| a.address })
   end
 end

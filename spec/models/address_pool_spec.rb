@@ -130,7 +130,7 @@ describe AddressPool do
         double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1"}'),
       ]))
 
-      expect(subject.reserved_addresses).to eq [
+      expect(subject.reserved_addresses.addrs).to eq [
         IPAddr.new('10.81.0.1'),
       ]
     end

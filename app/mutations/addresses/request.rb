@@ -42,7 +42,7 @@ module Addresses
     def available_addresses
       allocatable = @pool.allocatable
       reserved = @pool.reserved_addresses
-      addresses = allocatable.hosts(exclude: IPSet.new(reserved)).to_a
+      addresses = allocatable.hosts(exclude: reserved).to_a
 
       info "pool #{@pool} allocates from #{allocatable.to_cidr} and has #{reserved.length} reserved + #{addresses.length} available addresses"
 

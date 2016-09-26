@@ -3,12 +3,16 @@
 # Members can be networks, and you can test for network membership, including overlapping and underlapping networks.
 class IPSet
   attr_reader :addrs
-  
+
   # Initialize for given IPAddrs.
   #
   # @param addrs [Array<IPAddr>]
   def initialize(addrs)
     @addrs = addrs.sort
+  end
+
+  def length
+    @addrs.length
   end
 
   # Search for addrs contained within the given networks, or networks containing the given addr
