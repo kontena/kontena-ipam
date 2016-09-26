@@ -188,11 +188,16 @@ class IPAddr
     # The addr is yielded as a subnet addr with a subnet mask and host bits set.
     #
     # @param offset [Integer] skip the first N addresses
+    # @param range [Range<IPAddr>] more specific range of host addresses
     # @param exclude [IPSet] exclude specific addresses
     # @return [Enumerator<IPAddr>]
-    def hosts(offset: nil, exclude: nil)
+    def hosts(offset: nil, range: nil, exclude: nil)
+      range = to_range unless range
+
       Enumerator.new do |y|
-        for addr in to_range
+        for addr in range
+          addr = subnet_addr(addr)
+
           next if addr.network? || addr.broadcast?
           next if offset && addr.host_offset < offset
           next if exclude && (exclude.include? addr.to_host)

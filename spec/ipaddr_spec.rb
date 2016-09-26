@@ -136,6 +136,20 @@ describe IPAddr do
       expect(hosts.to_a).to eq((100..254).map{|i| IPAddr.new("192.0.2.#{i}/24")})
     end
 
+    it 'lists the host within a range in the middle' do
+      hosts = subject.hosts(range: IPAddr.new('192.0.2.64/28').to_range)
+
+      expect(hosts.first.to_cidr).to eq '192.0.2.64/24'
+      expect(hosts.to_a).to eq((64..79).map{|i| IPAddr.new("192.0.2.#{i}/24")})
+    end
+
+    it 'lists the host within a range at the start' do
+      hosts = subject.hosts(range: IPAddr.new('192.0.2.0/28').to_range)
+
+      expect(hosts.first.to_cidr).to eq '192.0.2.1/24'
+      expect(hosts.to_a).to eq((1..15).map{|i| IPAddr.new("192.0.2.#{i}/24")})
+    end
+
     it 'lists the host addresses excluding an IPSet of host addresses' do
       excludes = [20, 10, 11]
       exclude_addrs = excludes.map{|i| IPAddr.new("192.0.2.#{i}")}
