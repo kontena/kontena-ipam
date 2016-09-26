@@ -106,8 +106,8 @@ describe Addresses::Request do
 
         addresses = subject.available_addresses
 
-        expect(addresses.first).to eq IPAddr.new('10.81.0.1')
-        expect(addresses.last).to eq IPAddr.new('10.81.255.254')
+        expect(addresses.first).to eq IPAddr.new('10.81.0.1/16')
+        expect(addresses.last).to eq IPAddr.new('10.81.255.254/16')
         expect(addresses.size).to eq(2**16 - 2)
       end
     end
@@ -147,12 +147,12 @@ describe Addresses::Request do
 
     let :addresses do
       [
-        IPAddr.new('10.81.1.1'),
-        IPAddr.new('10.81.1.2'),
-        IPAddr.new('10.81.1.3'),
-        IPAddr.new('10.81.1.4'),
-        IPAddr.new('10.81.1.5'),
-        IPAddr.new('10.81.1.6'),
+        IPAddr.new('10.81.1.1/16'),
+        IPAddr.new('10.81.1.2/16'),
+        IPAddr.new('10.81.1.3/16'),
+        IPAddr.new('10.81.1.4/16'),
+        IPAddr.new('10.81.1.5/16'),
+        IPAddr.new('10.81.1.6/16'),
       ]
     end
 
@@ -165,10 +165,10 @@ describe Addresses::Request do
 
     let :available do
       [
-        IPAddr.new('10.81.1.1'),
-        IPAddr.new('10.81.1.4'),
-        IPAddr.new('10.81.1.5'),
-        IPAddr.new('10.81.1.6'),
+        IPAddr.new('10.81.1.1/16'),
+        IPAddr.new('10.81.1.4/16'),
+        IPAddr.new('10.81.1.5/16'),
+        IPAddr.new('10.81.1.6/16'),
       ]
     end
 
@@ -190,7 +190,6 @@ describe Addresses::Request do
       end
 
       it 'excludes all reserved addresses from the pool' do
-
         expect(pool).to receive(:reserved_addresses).and_return(IPSet.new(reserved))
 
         expect(subject.available_addresses).to eq available
@@ -203,7 +202,7 @@ describe Addresses::Request do
 
         expect(pool).to receive(:reserved_addresses).and_return(IPSet.new([]))
         expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1'))
-        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1')).and_return(addr)
+        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1/16')).and_return(addr)
 
         outcome = subject.run
 
@@ -216,8 +215,8 @@ describe Addresses::Request do
         addr = Address.new('kontena', '10.81.1.1', address: pool.subnet.subnet_addr('10.81.1.1'))
 
         expect(pool).to receive(:reserved_addresses).and_return(IPSet.new(reserved))
-        expect(policy).to receive(:allocate_address).with(available).and_return(IPAddr.new('10.81.1.1'))
-        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1')).and_return(addr)
+        expect(policy).to receive(:allocate_address).with(available).and_return(IPAddr.new('10.81.1.1/16'))
+        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1/16')).and_return(addr)
 
         outcome = subject.run
 
@@ -240,12 +239,12 @@ describe Addresses::Request do
         addr = Address.new('kontena', '10.81.1.2', address: pool.subnet.subnet_addr('10.81.1.2'))
 
         expect(pool).to receive(:reserved_addresses).and_return(IPSet.new([]))
-        expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1'))
-        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1')).and_raise(Address::Conflict)
+        expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1/16'))
+        expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1/16')).and_raise(Address::Conflict)
 
         expect(pool).to receive(:reserved_addresses).and_return(IPSet.new([IPAddr.new('10.81.1.1')]))
-        expect(policy).to receive(:allocate_address).with(addresses - [IPAddr.new('10.81.1.1')]).and_return(IPAddr.new('10.81.1.2'))
-        expect(Address).to receive(:create).with('kontena', '10.81.1.2', address: IPAddr.new('10.81.1.2')).and_return(addr)
+        expect(policy).to receive(:allocate_address).with(addresses - [IPAddr.new('10.81.1.1/16')]).and_return(IPAddr.new('10.81.1.2/16'))
+        expect(Address).to receive(:create).with('kontena', '10.81.1.2', address: IPAddr.new('10.81.1.2/16')).and_return(addr)
 
         outcome = subject.run
 

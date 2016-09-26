@@ -91,18 +91,20 @@ describe AddressPool do
 
       addr = subject.create_address(IPAddr.new('10.81.0.1'))
 
-      expect(addr).to eq Address.new('kontena', '10.81.0.1', address: subject.subnet.subnet_addr('10.81.0.1'))
+      expect(addr).to eq Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1/16'))
       expect(addr.address.to_cidr).to eq '10.81.0.1/16'
     end
 
     it 'gets an address from etcd' do
       expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/10.81.0.1').and_return(
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1"}'),
+        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
       )
 
       addr = subject.get_address(IPAddr.new('10.81.0.1'))
 
-      expect(addr).to eq Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1'))
+      expect(addr).to eq Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1/16'))
+      expect(addr.address).to eq IPAddr.new('10.81.0.1/16')
+      expect(addr.address.to_cidr).to eq '10.81.0.1/16'
     end
 
     it 'gets an missing address from etcd' do
@@ -115,24 +117,27 @@ describe AddressPool do
 
     it 'lists addresses from etcd' do
       expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1"}'),
+        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
       ]))
 
       addrs = subject.list_addresses
 
       expect(addrs).to eq [
-        Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1')),
+        Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1/16')),
       ]
+      expect(addrs.first.address.to_cidr).to eq '10.81.0.1/16'
     end
 
     it 'lists reserved addresses from etcd' do
       expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1"}'),
+        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
       ]))
 
-      expect(subject.reserved_addresses.addrs).to eq [
+      ipset = subject.reserved_addresses
+      expect(ipset.addrs).to eq [
         IPAddr.new('10.81.0.1'),
       ]
+      expect(ipset.addrs.first.to_cidr).to eq '10.81.0.1/32'
     end
 
     it 'deletes objects in etcd' do
