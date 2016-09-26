@@ -8,7 +8,7 @@ else
 end
 Logging.initialize_logger(STDOUT, log_level)
 
-EtcdModel.etcd = Etcd.client(host: 'localhost', port: 2379)
+EtcdModel.etcd = EtcdClient.new(ENV)
 
 IpamPlugin.policy = Policy.new(ENV)
 
