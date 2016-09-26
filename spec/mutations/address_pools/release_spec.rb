@@ -1,12 +1,4 @@
 describe AddressPools::Release do
-  let :etcd do
-    EtcdModel.etcd = spy()
-  end
-
-  before do
-    $etcd = etcd
-  end
-
   describe '#validate' do
     it 'rejects a missing network' do
       subject = described_class.new()
@@ -48,8 +40,7 @@ describe AddressPools::Release do
           subject = described_class.new(pool_id: 'kontena')
 
           expect(pool).to receive(:delete!)
-          expect(etcd).to receive(:delete).with('/kontena/ipam/addresses/kontena/', recursive: true)
-
+          
           outcome = subject.run
 
           expect(outcome).to be_success

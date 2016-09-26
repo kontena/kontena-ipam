@@ -22,9 +22,9 @@ class IpamPlugin < Sinatra::Application
     @@policy
   end
 
-  def self.ensure_keys
-    $etcd.set('/kontena/ipam/pools/', dir: true) rescue nil
-    $etcd.set('/kontena/ipam/addresses/', dir: true) rescue nil
+  def ensure_models
+    AddressPool.mkdir()
+    Address.mkdir()
   end
 
   # Return HTTP 400 { "Error": ... } if the Mutations::Command#validate rejects the parameters
@@ -59,8 +59,7 @@ class IpamPlugin < Sinatra::Application
   end
 
   post '/Plugin.Activate' do
-    $etcd.set('/kontena/ipam/pools/', dir: true) rescue nil
-    $etcd.set('/kontena/ipam/addresses/', dir: true) rescue nil
+    ensure_models
 
     json(
       'Implements' => ['IpamDriver'],

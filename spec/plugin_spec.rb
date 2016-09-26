@@ -10,14 +10,6 @@ describe IpamPlugin do
     )
   end
 
-  let :etcd do
-    spy()
-  end
-
-  before do
-    $etcd = EtcdModel.etcd = etcd
-  end
-
   let :app do
     described_class.new
   end
@@ -42,6 +34,9 @@ describe IpamPlugin do
 
   describe '/Plugin.Activate' do
     it 'implements IpamDriver' do
+      expect(AddressPool).to receive(:mkdir).with(no_args)
+      expect(Address).to receive(:mkdir).with(no_args)
+      
       data = api_post '/Plugin.Activate', nil
 
       expect(data).to eq({ 'Implements' => ['IpamDriver'] })

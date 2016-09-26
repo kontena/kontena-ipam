@@ -8,11 +8,6 @@ module Addresses
         @sym = sym
       end
     end
-    class AddressConflict < AddressError
-      def sym
-        :conflict
-      end
-    end
 
     include Logging
 
@@ -46,7 +41,7 @@ module Addresses
     # @return [Array<IPAddr>]
     def available_addresses
       allocatable = @pool.allocatable
-      reserved = @pool.reserved
+      reserved = @pool.reserved_addresses
       addresses = allocatable.list_hosts(exclude: IPSet.new(reserved))
 
       info "pool #{@pool} allocates from #{allocatable.to_cidr} and has #{reserved.length} reserved + #{addresses.length} available addresses"
@@ -74,11 +69,10 @@ module Addresses
     # @return [Address] reserved address
     def request_static
       # reserve
-      unless address = @pool.create_address(@address)
-        raise AddressConflict, "Allocation conflict for address #{@address}"
-      end
+      return @pool.create_address(@address)
 
-      return address
+    rescue Address::Conflict => error
+      raise AddressError.new(:conflict), "Allocation conflict for address #{@address}: #{error.message}"
     end
 
     # Allocate dynamic address within @pool.
@@ -93,12 +87,9 @@ module Addresses
       end
 
       # reserve
-      unless address = @pool.create_address(allocate_address)
-        raise AddressConflict, "Concurrent allocation for address #{allocate_address}"
-      end
+      return @pool.create_address(allocate_address)
 
-      return address
-    rescue AddressConflict => error
+    rescue Address::Conflict => error
       warn "retry dynamic address allocation: #{error.message}"
 
       # should make progress given that we refresh the set of reserved addresses, and raise a different error if the pool is full
