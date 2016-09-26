@@ -23,6 +23,25 @@ class IPAddr
       end
     end
 
+    # Compares with a different IPAddr, including subnet mask.
+    def <=>(other)
+      other = coerce_other(other)
+
+      return nil if other.family != @family
+
+      if @addr != other.to_i
+        return @addr <=> other.to_i
+      else
+        return _netmask <=> other._netmask
+      end
+    end
+    def ==(other)
+      (self <=> other) == 0
+    end
+    def eql?(other)
+      (self <=> other) == 0
+    end
+
     # @return [Integer] /X CIDR prefix length
     def length
         @mask_addr.to_s(2).count('1')
