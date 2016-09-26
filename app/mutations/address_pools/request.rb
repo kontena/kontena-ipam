@@ -27,7 +27,7 @@ module AddressPools
     end
 
     def validate
-      add_error(:ipv6, :not_supported, 'IPV6 is not supported') if self.ipv6
+      add_error(:ipv6, :not_supported, 'IPv6 is not supported') if self.ipv6
       @subnet = IPAddr.new(subnet) if subnet_present? rescue add_error(:subnet, :invalid, "Invalid address")
       @iprange = IPAddr.new(iprange) if iprange_present? rescue add_error(:iprange, :invalid, "Invalid address")
     end
