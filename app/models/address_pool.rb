@@ -36,11 +36,11 @@ class AddressPool
     Subnet.delete(@subnet)
   end
 
-  # Return the set of allocatable addresses.
+  # Return the range of of allocatable addresses.
   #
-  # @return [IPAddr] subnet
-  def allocatable
-    @iprange || @subnet
+  # @return [Range<IPAddr>] allocation range
+  def allocation_range
+    (@iprange or @subnet).to_range
   end
 
   # Return given Address from AddressPool
@@ -72,5 +72,12 @@ class AddressPool
   # @return [IPSet]
   def reserved_addresses
     IPSet.new(list_addresses.map{|a| a.address.to_host })
+  end
+
+  # Compute available addresses for allocation within pool
+  #
+  # @return [Array<IPAddr>]
+  def available_addresses
+    @subnet.hosts(range: allocation_range, exclude: reserved_addresses).to_a
   end
 end

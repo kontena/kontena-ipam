@@ -151,21 +151,132 @@ describe AddressPool do
 
   context 'for an AddressPool without an iprange' do
     let :subject do
-      described_class.new('test', subnet: IPAddr.new('10.80.0.0/16'))
+      described_class.new('test', subnet: IPAddr.new('10.80.0.0/24'))
     end
 
-    it 'allocates from the entire subnet' do
-      expect(subject.allocatable).to eq IPAddr.new('10.80.0.0/16')
+    describe '#allocation_range' do
+      it 'allocates from the entire subnet' do
+        expect(subject.allocation_range.first).to eq IPAddr.new('10.80.0.0/24')
+        expect(subject.allocation_range.last).to eq IPAddr.new('10.80.0.255/24')
+      end
+    end
+
+    describe '#available_addresses' do
+      it 'returns the reduced subnet pool' do
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: []))
+
+        addresses = subject.available_addresses
+
+        expect(addresses.first).to eq IPAddr.new('10.80.0.1/24')
+        expect(addresses).to eq (IPAddr.new('10.80.0.1/24')..IPAddr.new('10.80.0.254/24')).to_a
+        expect(addresses.last).to eq IPAddr.new('10.80.0.254/24')
+        expect(addresses.size).to eq(254)
+
+      end
+
+      it 'excludes reserved addresses from the reduced subnet pool' do
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: [
+          double(key: '/kontena/ipam/addresses/kontena/10.80.0.1', directory?: false, value: '{"address": "10.80.0.1/24"}'),
+        ]))
+
+        addresses = subject.available_addresses
+
+        expect(addresses.first).to eq IPAddr.new('10.80.0.2/24')
+        expect(addresses).to eq (IPAddr.new('10.80.0.2/24')..IPAddr.new('10.80.0.254/24')).to_a
+        expect(addresses.size).to eq(253)
+      end
     end
   end
 
   context 'for an AddressPool with an iprange' do
     let :subject do
-      described_class.new('test', subnet: IPAddr.new('10.80.0.0/16'), iprange: IPAddr.new('10.80.128.0/17'))
+      AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.1.0/29'))
     end
 
-    it 'allocates from the entire subnet' do
-      expect(subject.allocatable).to eq IPAddr.new('10.80.128.0/17')
+    let :addresses do
+      [
+        IPAddr.new('10.81.1.0/16'),
+        IPAddr.new('10.81.1.1/16'),
+        IPAddr.new('10.81.1.2/16'),
+        IPAddr.new('10.81.1.3/16'),
+        IPAddr.new('10.81.1.4/16'),
+        IPAddr.new('10.81.1.5/16'),
+        IPAddr.new('10.81.1.6/16'),
+        IPAddr.new('10.81.1.7/16'),
+      ]
+    end
+
+    let :reserved do
+      [
+        IPAddr.new('10.81.1.2'),
+        IPAddr.new('10.81.1.3'),
+      ]
+    end
+
+    let :available do
+      [
+        IPAddr.new('10.81.1.0/16'),
+        IPAddr.new('10.81.1.1/16'),
+        IPAddr.new('10.81.1.4/16'),
+        IPAddr.new('10.81.1.5/16'),
+        IPAddr.new('10.81.1.6/16'),
+        IPAddr.new('10.81.1.7/16'),
+      ]
+    end
+
+    describe '#allocation_range' do
+      it 'allocates from the  full range' do
+        expect(subject.allocation_range.first).to eq IPAddr.new('10.81.1.0/29')
+        expect(subject.allocation_range.last).to eq IPAddr.new('10.81.1.7/29')
+      end
+    end
+
+    describe '#available_addresses' do
+      it 'returns the full iprange pool' do
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: []))
+
+        addresses = subject.available_addresses
+
+        expect(addresses.first).to eq IPAddr.new('10.81.1.0/16')
+        expect(addresses).to eq (IPAddr.new('10.81.1.0/16')..IPAddr.new('10.81.1.7/16')).to_a
+        expect(addresses.last).to eq IPAddr.new('10.81.1.7/16')
+        expect(addresses.size).to eq 8
+      end
+
+      it 'excludes reserved addresses from the full iprange pool' do
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: reserved.map{|a|
+          double(key: "/kontena/ipam/addresses/test/#{a.to_s}", directory?: false, value: {'address' => a}.to_json)
+        }))
+
+        expect(subject.available_addresses).to eq available
+      end
     end
   end
+
+  context 'for an AddressPool with an iprange at the edge of the subnet' do
+    let :subject do
+      AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.0.0/24'))
+    end
+
+    describe '#allocation_range' do
+      it 'allocates from the full range' do
+        expect(subject.allocation_range.first).to eq IPAddr.new('10.81.0.0/24')
+        expect(subject.allocation_range.last).to eq IPAddr.new('10.81.0.255/24')
+      end
+    end
+
+    describe '#available_addresses' do
+      it 'returns the reduced iprange' do
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: []))
+
+        addresses = subject.available_addresses
+
+        expect(addresses.first).to eq IPAddr.new('10.81.0.1/16')
+        expect(addresses).to eq (IPAddr.new('10.81.0.1/16')..IPAddr.new('10.81.0.255/16')).to_a
+        expect(addresses.last).to eq IPAddr.new('10.81.0.255/16')
+        expect(addresses.size).to eq 255
+      end
+    end
+  end
+
 end
