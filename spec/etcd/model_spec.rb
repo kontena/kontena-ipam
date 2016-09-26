@@ -34,7 +34,7 @@ describe EtcdModel do
       end
 
       it 'renders the complete path prefix for the class' do
-        expect(subject.prefix('test1')).to eq '/test/test1/'
+        expect(subject.prefix('test1')).to eq '/test/test1'
       end
 
       it 'fails the prefix if given too many arguments' do
@@ -44,7 +44,7 @@ describe EtcdModel do
   end
 
   let :etcd do
-    etcd = spy()
+    etcd = double(:etcd)
   end
 
   before do
@@ -113,6 +113,10 @@ describe EtcdModel do
 
         TestEtcd.mkdir()
       end
+
+      it 'fails if given a full key' do
+        expect{TestEtcd.mkdir('test')}.to raise_error(ArgumentError)
+      end
     end
 
     describe '#get' do
@@ -176,8 +180,13 @@ describe EtcdModel do
       expect(TestEtcd.list()).to eq [
         TestEtcd.new('test1', field: "value 1"),
         TestEtcd.new('test2', field: "value 2"),
-
       ]
+    end
+
+    it 'lists empty if directory is missing in etcd' do
+      expect(etcd).to receive(:get).with('/test/').and_raise(Etcd::KeyNotFound)
+
+      expect(TestEtcd.list()).to eq []
     end
 
     it 'deletes instance from etcd' do
@@ -190,6 +199,12 @@ describe EtcdModel do
       expect(etcd).to receive(:delete).with('/test/', recursive: true)
 
       TestEtcd.delete()
+    end
+
+    it 'deletes instance from etcd' do
+      expect(etcd).to receive(:delete).with('/test/test1', recursive: false)
+
+      TestEtcd.delete('test1')
     end
   end
 
@@ -229,6 +244,10 @@ describe EtcdModel do
         expect(etcd).to receive(:set).with('/test/parent/children/', dir: true, prevExist: false)
 
         TestEtcdChild.mkdir('parent')
+      end
+
+      it 'fails if given a full key' do
+        expect{TestEtcdChild.mkdir('parent', 'child')}.to raise_error(ArgumentError)
       end
     end
 

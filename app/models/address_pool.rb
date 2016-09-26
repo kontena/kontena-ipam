@@ -8,23 +8,32 @@ class AddressPool
 
   attr_accessor :id, :subnet, :iprange
 
-  # Returns currently allocated subnets.
+  # Return currently reserved subnets
   #
-  # @return [Array<IPAddr>] existing subnet allcoations
+  # @return [IPSet]
   def self.reserved_subnets
-      self.list.map{|pool| pool.subnet}
+    Subnet.all
   end
 
-  # Create Address directory for this pool
+  # Reserve Subnet and create Address directory for this pool
+  #
+  # @raise [Subnet::Conflict] if reserving the subnet fails
+  # @see Address
+  # @see Subnet
   def create!
+    Subnet.reserve(@subnet)
     super
     Address.mkdir(@id)
   end
 
-  # Delete Address directory for this pool
+  # Delete Address directory and release Subnet for this pool
+  #
+  # @see Address
+  # @see Subnet
   def delete!
     super
     Address.delete(@id)
+    Subnet.delete(@subnet)
   end
 
   # Return the set of allocatable addresses.
@@ -59,8 +68,8 @@ class AddressPool
 
   # Return the set of reserved IP addresses from etcd.
   #
-  # @return [Array<IPAddr>]
+  # @return [IPSet]
   def reserved_addresses
-    list_addresses.map{|a| a.address }
+    IPSet.new(list_addresses.map{|a| a.address })
   end
 end

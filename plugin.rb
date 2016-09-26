@@ -23,6 +23,7 @@ class IpamPlugin < Sinatra::Application
   end
 
   def ensure_models
+    Subnet.mkdir()
     AddressPool.mkdir()
     Address.mkdir()
   end

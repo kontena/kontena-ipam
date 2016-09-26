@@ -40,7 +40,7 @@ describe AddressPools::Release do
           subject = described_class.new(pool_id: 'kontena')
 
           expect(pool).to receive(:delete!)
-          
+
           outcome = subject.run
 
           expect(outcome).to be_success

@@ -75,12 +75,11 @@ module AddressPools
     # @raise [RequestError]
     # @return [AddressPool]
     def request_static
-      # allocate; XXX: this is not transactional
-      if conflict = AddressPool.reserved_subnets.find { |s| s if s.include?(@subnet) || @subnet.include?(s) }
-        raise RequestError.new(:subnet, :conflict), "#{subnet} conflict with #{conflict.to_cidr}"
-      end
-
+      # reserve
       return AddressPool.create_or_get(self.network, subnet: @subnet, iprange: @iprange)
+
+    rescue Subnet::Conflict => error
+      raise RequestError.new(:subnet, :conflict), "#{@subnet} conflict: #{error}"
     end
 
     # Request for a network with a dynamically allocated subnet.
@@ -88,12 +87,19 @@ module AddressPools
     # @raise [RequestError]
     # @return [AddressPool]
     def request_dynamic
-      # allocate; XXX: this is not transactional
-      unless subnet = policy.allocate_subnet(AddressPool.reserved_subnets)
+      reserved = AddressPool.reserved_subnets
+
+      # allocate
+      unless subnet = policy.allocatable_subnets(reserved).first
         raise RequestError.new(:subnet, :allocate), "supernet #{policy.supernet} is exhausted"
       end
 
+      # reserve
       return AddressPool.create_or_get(self.network, subnet: subnet)
+
+    rescue Subnet::Conflict => error
+      warn "retry on subnet conflict: #{error}"
+      retry
     end
   end
 end

@@ -1,6 +1,6 @@
 describe AddressPool do
   let :etcd do
-    spy()
+    double(:etcd)
   end
 
   before do
@@ -8,6 +8,10 @@ describe AddressPool do
   end
 
   it 'creates objects in etcd' do
+    expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.0.0', prevExist: false, value: '{"address":"10.81.0.0/16"}')
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
+      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+    ]))
     expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
     expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
 
@@ -36,6 +40,10 @@ describe AddressPool do
 
   describe '#create_or_get' do
     it 'stores new object to etcd' do
+      expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.0.0', prevExist: false, value: '{"address":"10.81.0.0/16"}')
+      expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
+        double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+      ]))
       expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
 
@@ -43,6 +51,12 @@ describe AddressPool do
     end
 
     it 'loads existing object from etcd' do
+      expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.0.0', prevExist: false, value: '{"address":"10.81.0.0/16"}')
+      expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
+        double(key: '/kontena/ipam/subnets/10.80.0.0', directory?: false, value: '{"address": "10.80.0.0/16"}'),
+        double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+      ]))
+
       expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}').and_raise(Etcd::NodeExist)
       expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(
           double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.80.0.0/16"}'),
@@ -54,11 +68,15 @@ describe AddressPool do
   end
 
   it 'lists reserved subnets from etcd' do
-    expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
+      double(key: '/kontena/ipam/subnets/10.0.0.0', directory?: false, value: '{"address": "10.80.0.0/24"}'),
+      double(key: '/kontena/ipam/subnets/10.0.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
+      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
     ]))
 
-    expect(described_class.reserved_subnets).to eq [
+    expect(described_class.reserved_subnets.addrs).to eq [
+      IPAddr.new("10.80.0.0/24"),
+      IPAddr.new("10.80.1.0/24"),
       IPAddr.new("10.81.0.0/16"),
     ]
   end
@@ -112,7 +130,7 @@ describe AddressPool do
         double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1"}'),
       ]))
 
-      expect(subject.reserved_addresses).to eq [
+      expect(subject.reserved_addresses.addrs).to eq [
         IPAddr.new('10.81.0.1'),
       ]
     end
@@ -120,6 +138,7 @@ describe AddressPool do
     it 'deletes objects in etcd' do
       expect(etcd).to receive(:delete).with('/kontena/ipam/pools/kontena')
       expect(etcd).to receive(:delete).with('/kontena/ipam/addresses/kontena/', recursive: true)
+      expect(etcd).to receive(:delete).with('/kontena/ipam/subnets/10.81.0.0', recursive: false)
 
       subject.delete!
     end

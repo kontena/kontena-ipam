@@ -34,9 +34,10 @@ describe IpamPlugin do
 
   describe '/Plugin.Activate' do
     it 'implements IpamDriver' do
+      expect(Subnet).to receive(:mkdir).with(no_args)
       expect(AddressPool).to receive(:mkdir).with(no_args)
       expect(Address).to receive(:mkdir).with(no_args)
-      
+
       data = api_post '/Plugin.Activate', nil
 
       expect(data).to eq({ 'Implements' => ['IpamDriver'] })

@@ -1,9 +1,14 @@
 describe AddressPools::Request do
   let :policy do
-    Policy.new(
-      'KONTENA_IPAM_SUPERNET' => '10.80.0.0/12',
-      'KONTENA_IPAM_SUBNET_LENGTH' => '24',
+    double(:policy,
+      supernet: IPAddr.new('10.80.0.0/16'),
     )
+  end
+
+  before do
+    allow(policy).to receive(:is_a?).with(Hash).and_return(false)
+    allow(policy).to receive(:is_a?).with(Array).and_return(false)
+    allow(policy).to receive(:is_a?).with(Policy).and_return(true)
   end
 
   describe '#validate' do
@@ -86,9 +91,10 @@ describe AddressPools::Request do
       end
 
       it 'returns new address pool' do
+        ipset = IPSet.new([])
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return([])
-        expect(policy).to receive(:allocate_subnets).and_yield(IPAddr.new('10.80.0.0/24'))
+        expect(Subnet).to receive(:all).with(no_args).and_return(ipset)
+        expect(policy).to receive(:allocatable_subnets).with(ipset).and_return([IPAddr.new('10.80.0.0/24')])
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.80.0.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/24')))
 
         outcome = subject.run
@@ -98,11 +104,12 @@ describe AddressPools::Request do
       end
 
       it 'returns a different address pool if some other network already exists in etcd' do
-        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return([
-          AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')),
+        ipset = IPSet.new([
+          IPAddr.new('10.80.0.0/24'),
         ])
-        expect(policy).to receive(:allocate_subnets).with([IPAddr.new('10.80.0.0/24')]).and_yield(IPAddr.new('10.80.1.0/24'))
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(Subnet).to receive(:all).with(no_args).and_return(ipset)
+        expect(policy).to receive(:allocatable_subnets).with(ipset).and_return([IPAddr.new('10.80.1.0/24')])
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.80.1.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.1.0/24')))
 
         outcome = subject.run
@@ -112,15 +119,10 @@ describe AddressPools::Request do
       end
 
       it 'fails if the supernet is exhausted' do
-        pools = []
-        subnets = []
-        (80..95).each do |i|
-          subnets << subnet = IPAddr.new("10.#{i}.0.0/16")
-          pools << AddressPool.new("test-#{i}", subnet: subnet)
-        end
+        ipset = IPSet.new((80..95).map { |i| IPAddr.new("10.#{i}.0.0/16") })
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return(pools)
-        expect(policy).to receive(:allocate_subnets).with(subnets).and_return(nil)
+        expect(Subnet).to receive(:all).with(no_args).and_return(ipset)
+        expect(policy).to receive(:allocatable_subnets).with(ipset).and_return([])
 
         outcome = subject.run
 
@@ -154,9 +156,7 @@ describe AddressPools::Request do
 
       it 'fails if a network already exists with the same subnet' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return([
-          AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16')),
-        ])
+        expect(Subnet).to receive(:create).with(IPAddr.new('10.81.0.0/16')).and_raise(Subnet::Conflict)
 
         outcome = subject.run
 
@@ -165,10 +165,32 @@ describe AddressPools::Request do
       end
 
       it 'fails if a network already exists with an overlapping subnet' do
+        subnet = Subnet.new('10.81.0.0', address: IPAddr.new('10.81.0.0/16'))
+
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return([
-          AddressPool.new('test', subnet: IPAddr.new('10.81.10.0/24')),
-        ])
+        expect(Subnet).to receive(:create).with(IPAddr.new('10.81.0.0/16')).and_return(subnet)
+        expect(Subnet).to receive(:all).with(no_args).and_return(IPSet.new([
+          IPAddr.new('10.80.0.0/15'),
+          IPAddr.new('10.81.0.0/16')
+        ]))
+        expect(subnet).to receive(:delete!)
+
+        outcome = subject.run
+
+        expect(outcome).to_not be_success
+        expect(outcome.errors.symbolic[:subnet]).to eq :conflict
+      end
+
+      it 'fails if a network already exists with an underlapping subnet' do
+        subnet = Subnet.new('10.81.0.0', address: IPAddr.new('10.81.0.0/16'))
+
+        expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
+        expect(Subnet).to receive(:create).with(IPAddr.new('10.81.0.0/16')).and_return(subnet)
+        expect(Subnet).to receive(:all).with(no_args).and_return(IPSet.new([
+          IPAddr.new('10.81.0.0/16'),
+          IPAddr.new('10.81.10.0/24'),
+        ]))
+        expect(subnet).to receive(:delete!)
 
         outcome = subject.run
 
@@ -178,9 +200,6 @@ describe AddressPools::Request do
 
       it 'returns address pool if some other network exists in etcd' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return([
-          AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')),
-        ])
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
 
         outcome = subject.run
@@ -201,7 +220,6 @@ describe AddressPools::Request do
 
       it 'creates the address pool with the ipragnge' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
-        expect(AddressPool).to receive(:list).with(no_args).and_return([])
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.128.0/17')).and_return(pool)
 
         outcome = subject.run
