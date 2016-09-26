@@ -84,6 +84,7 @@ class IpamPlugin < Sinatra::Application
       network: params.dig('Options', 'network'),
       subnet: params['Pool'],
       iprange: params['SubPool'],
+      ipv6: params['V6']
     )
 
     json(

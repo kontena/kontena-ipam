@@ -63,7 +63,7 @@ describe IpamPlugin do
 
       expect(last_response.status).to eq(400), last_response.errors
 
-      expect(data).to eq("JSON parse error: 757: unexpected token at '\"invalid\"'")
+      expect(data).to match(/^JSON parse error: \d*: unexpected token at '\"invalid\"'$/)
     end
 
     it 'returns 400 on missing network option' do
@@ -83,7 +83,7 @@ describe IpamPlugin do
     end
 
     it 'accepts with only the required parameters' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: nil, iprange: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: nil, iprange: nil, ipv6: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
 
       data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}}
 
@@ -92,7 +92,7 @@ describe IpamPlugin do
     end
 
     it 'accepts with an empty optional param' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: '', iprange: '').and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: '', iprange: '', ipv6: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
 
       data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}, 'Pool' => '', 'SubPool' => ''}
 
@@ -101,7 +101,7 @@ describe IpamPlugin do
     end
 
     it 'accepts with an optional pool' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: nil, ipv6: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
 
       data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16'}
 
@@ -110,7 +110,7 @@ describe IpamPlugin do
     end
 
     it 'accepts with an optional iprange' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.127.0/17').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
+      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.127.0/17', ipv6: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
 
       data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16', 'SubPool' => '10.81.127.0/17'}
 

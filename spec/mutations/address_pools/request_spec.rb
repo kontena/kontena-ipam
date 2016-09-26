@@ -52,6 +52,17 @@ describe AddressPools::Request do
 
       expect(subject).not_to have_errors, subject.validation_outcome.errors.inspect
     end
+
+    it 'rejects ipv6 pool request' do
+      subject = described_class.new(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.128.0/17', ipv6: true)
+      expect(subject).to have_errors
+      expect(subject.validation_outcome.errors.symbolic[:ipv6]).to eq :not_supported
+    end
+
+    it 'default to false ipv6 when ipv6 flag nil' do
+      subject = described_class.new(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.128.0/17', ipv6: nil)
+      expect(subject).not_to have_errors
+    end
   end
 
   describe '#reserved_subnets' do
