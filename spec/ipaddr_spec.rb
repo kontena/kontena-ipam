@@ -34,6 +34,38 @@ describe IPAddr do
     it 'encodes host addresses to JSON' do
       expect(JSON.dump('test' => IPAddr.new('10.80.1.1'))).to eq '{"test":"10.80.1.1"}'
     end
+
+    it 'compares equal without a netmask' do
+      expect(IPAddr.new('192.0.2.1') <=> IPAddr.new('192.0.2.1')).to eq 0
+      expect(IPAddr.new('192.0.2.1') == IPAddr.new('192.0.2.1')).to be true
+      expect(IPAddr.new('192.0.2.1').eql? IPAddr.new('192.0.2.1')).to be true
+    end
+    it 'compares equal with a netmask' do
+      expect(IPAddr.new('192.0.2.1/24') <=> IPAddr.new('192.0.2.1/24')).to eq 0
+      expect(IPAddr.new('192.0.2.1/24') == IPAddr.new('192.0.2.1/24')).to be true
+      expect(IPAddr.new('192.0.2.1/24').eql? IPAddr.new('192.0.2.1/24')).to be true
+    end
+    it 'compares unequal with a netmask' do
+      expect(IPAddr.new('192.0.2.1/24') <=> IPAddr.new('192.0.2.1')).to_not eq 0
+      expect(IPAddr.new('192.0.2.1/24') == IPAddr.new('192.0.2.1')).to be false
+      expect(IPAddr.new('192.0.2.1/24').eql? IPAddr.new('192.0.2.1')).to be false
+    end
+    it 'compares unequal without a netmask' do
+      expect(IPAddr.new('192.0.2.1') <=> IPAddr.new('192.0.2.1/24')).to_not eq 0
+      expect(IPAddr.new('192.0.2.1') == IPAddr.new('192.0.2.1/24')).to be false
+      expect(IPAddr.new('192.0.2.1').eql? IPAddr.new('192.0.2.1/24')).to be false
+    end
+
+    it 'sorts the supernet before the subnets' do
+      addrs = [
+        IPAddr.new('10.80.0.0/16'),
+        IPAddr.new('10.80.1.0/24'),
+        IPAddr.new('10.80.2.0/24'),
+        IPAddr.new('10.81.0.0/16'),
+      ]
+
+      expect(addrs.sort).to eq addrs
+    end
   end
 
   describe "for IPv6 addresses" do
@@ -91,20 +123,34 @@ describe IPAddr do
     it 'lists the host addresses' do
       hosts = subject.hosts
 
-      expect(hosts.first).to eq '192.0.2.1'
+      expect(hosts.first).to eq IPAddr.new('192.0.2.1/24')
       expect(hosts.first).to_not be_host
       expect(hosts.first.to_cidr).to eq '192.0.2.1/24'
-      expect(hosts.to_a).to eq((1..254).map{|i| IPAddr.new("192.0.2.#{i}")})
+      expect(hosts.to_a).to eq((1..254).map{|i| IPAddr.new("192.0.2.#{i}/24")})
     end
 
     it 'lists the host from an offset' do
       hosts = subject.hosts(offset: 100)
 
       expect(hosts.first.to_cidr).to eq '192.0.2.100/24'
-      expect(hosts.to_a).to eq((100..254).map{|i| IPAddr.new("192.0.2.#{i}")})
+      expect(hosts.to_a).to eq((100..254).map{|i| IPAddr.new("192.0.2.#{i}/24")})
     end
 
-    it 'lists the host addresses with an IPSet exclude' do
+    it 'lists the host within a range in the middle' do
+      hosts = subject.hosts(range: IPAddr.new('192.0.2.64/28').to_range)
+
+      expect(hosts.first.to_cidr).to eq '192.0.2.64/24'
+      expect(hosts.to_a).to eq((64..79).map{|i| IPAddr.new("192.0.2.#{i}/24")})
+    end
+
+    it 'lists the host within a range at the start' do
+      hosts = subject.hosts(range: IPAddr.new('192.0.2.0/28').to_range)
+
+      expect(hosts.first.to_cidr).to eq '192.0.2.1/24'
+      expect(hosts.to_a).to eq((1..15).map{|i| IPAddr.new("192.0.2.#{i}/24")})
+    end
+
+    it 'lists the host addresses excluding an IPSet of host addresses' do
       excludes = [20, 10, 11]
       exclude_addrs = excludes.map{|i| IPAddr.new("192.0.2.#{i}")}
 
@@ -115,7 +161,7 @@ describe IPAddr do
       expect(hosts.to_a).to eq((1..254).map { |i|
         next if excludes.include? i
 
-        IPAddr.new("192.0.2.#{i}")
+        IPAddr.new("192.0.2.#{i}/24")
       }.compact)
     end
 

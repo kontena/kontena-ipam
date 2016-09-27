@@ -36,19 +36,6 @@ module Addresses
       add_error(:address, :invalid, error.message)
     end
 
-    # Compute available addresses for allocation within pool
-    #
-    # @return [Array<IPAddr>]
-    def available_addresses
-      allocatable = @pool.allocatable
-      reserved = @pool.reserved_addresses
-      addresses = allocatable.hosts(exclude: reserved).to_a
-
-      info "pool #{@pool} allocates from #{allocatable.to_cidr} and has #{reserved.length} reserved + #{addresses.length} available addresses"
-
-      addresses
-    end
-
     def execute
       if @address
         info "request static address #{@address} in pool #{@pool.id} with subnet #{@pool.subnet}"
@@ -81,8 +68,12 @@ module Addresses
     # @raise AddressError if allocation failed (pool is full)
     # @return [Address] reserved address
     def request_dynamic
+      available = @pool.available_addresses
+
+      info "pool #{@pool} allocates from #{@pool.allocation_range} and has #{available.length} available addresses"
+
       # allocate
-      unless allocate_address = policy.allocate_address(available_addresses)
+      unless allocate_address = policy.allocate_address(available)
         raise AddressError.new(:allocate), "No addresses available for allocation"
       end
 
