@@ -56,6 +56,9 @@ RSpec.configure do |config|
     # a real object. This is generally recommended, and will default to
     # `true` in RSpec 4.
     mocks.verify_partial_doubles = false
+
+    # Verify that doubled clases exist.
+    mocks.verify_doubled_constant_names = true
   end
 
   config.before(:each) do

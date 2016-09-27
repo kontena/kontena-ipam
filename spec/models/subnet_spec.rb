@@ -1,6 +1,6 @@
 describe Subnet do
   let :etcd do
-    double()
+    instance_double(EtcdClient)
   end
 
   before do
@@ -8,10 +8,10 @@ describe Subnet do
   end
 
   it 'lists all subnets in etcd' do
-    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-      double(key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
     ]))
 
     expect(Subnet.all.addrs).to eq [
@@ -23,11 +23,11 @@ describe Subnet do
 
   it 'reserves a subnet in etcd' do
     expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.82.0.0', prevExist: false, value: '{"address":"10.82.0.0/16"}')
-    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-      double(key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
-      double(key: '/kontena/ipam/subnets/10.82.0.0', directory?: false, value: '{"address": "10.82.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.82.0.0', directory?: false, value: '{"address": "10.82.0.0/16"}'),
     ]))
 
     expect(Subnet.reserve(IPAddr.new('10.82.0.0/16'))).to eq Subnet.new('10.82.0.0', address: IPAddr.new('10.82.0.0/16'))
@@ -41,11 +41,11 @@ describe Subnet do
 
   it 'raises on underlap conflict' do
     expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.80.0.0', prevExist: false, value: '{"address":"10.80.0.0/16"}')
-    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-      double(key: '/kontena/ipam/subnets/10.80.0.0', directory?: false, value: '{"address": "10.80.0.0/16"}'),
-      double(key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.0.0', directory?: false, value: '{"address": "10.80.0.0/16"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
     ]))
     expect(etcd).to receive(:delete).with('/kontena/ipam/subnets/10.80.0.0')
 
@@ -54,11 +54,11 @@ describe Subnet do
 
   it 'raises on overlap conflict' do
     expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.1.0', prevExist: false, value: '{"address":"10.81.1.0/24"}')
-    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-      double(key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
-      double(key: '/kontena/ipam/subnets/10.81.1.0', directory?: false, value: '{"address": "10.81.1.0/24"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.2.0', directory?: false, value: '{"address": "10.80.2.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.1.0', directory?: false, value: '{"address": "10.81.1.0/24"}'),
     ]))
     expect(etcd).to receive(:delete).with('/kontena/ipam/subnets/10.81.1.0')
 

@@ -1,6 +1,6 @@
 describe Addresses::Request do
   let :policy do
-    double(:policy)
+    instance_double(Policy)
   end
 
   before do

@@ -8,9 +8,12 @@ describe Etcd::Keys do
   end
 
   it 'returns nodes' do
-    pools_kontena = double('pools/kontena', key: '/kontena/ipam/pools/kontena', value: '{"network": "kontena", "subnet": "10.81.0.0/16"}')
+    pools_kontena = instance_double(Etcd::Response,
+      key: '/kontena/ipam/pools/kontena',
+      value: '{"network": "kontena", "subnet": "10.81.0.0/16"}',
+    )
 
-    expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double('pools',
+    expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(instance_double(Etcd::Response,
       children: [
         pools_kontena
       ],
