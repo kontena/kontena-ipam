@@ -13,6 +13,11 @@ require_relative '../app/logging.rb'
 require 'webmock/rspec'
 require 'rack/test'
 
+require_relative '../lib/etcd/fake_server'
+require_relative '../lib/etcd/test_server'
+require_relative 'etcd_helpers'
+
+
 log_target = ENV['LOG_TARGET'] || '/dev/null'
 Logging.initialize_logger(log_target, Logger::DEBUG)
 
@@ -61,8 +66,20 @@ RSpec.configure do |config|
     mocks.verify_doubled_constant_names = true
   end
 
-  config.before(:each) do
+  config.include EtcdHelpers
+  config.before(:each, :etcd => true) do
+    if etcd_endpoint = ENV['ETCD_ENDPOINT']
+      uri = URI(etcd_endpoint)
 
+      WebMock.disable_net_connect!(allow: "#{uri.host}:#{uri.port}")
+    else
+      WebMock.stub_request(:any, /localhost:2379/).to_rack(etcd_server.api)
+    end
+
+    # clear etcd database
+    etcd_server.reset!
+
+    EtcdModel.etcd = EtcdClient.new()
   end
 
   # Implement spec timeouts
