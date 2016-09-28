@@ -62,6 +62,14 @@ RSpec.configure do |config|
   end
 
   config.before(:each) do
+
+  end
+
+  # Implement spec timeouts
+  config.around(:each) do |example|
+    Timeout::timeout(5) do
+      example.run
+    end
   end
 
 # The settings below are suggested to provide a good initial experience
