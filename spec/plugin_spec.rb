@@ -10,12 +10,12 @@ describe IpamPlugin do
     )
   end
 
-  let :app do
-    described_class.new
+  before :each do
+    IpamPlugin.policy = policy
   end
 
-  before do
-    described_class.policy = policy
+  let :app do
+    subject
   end
 
   def api_post(url, params = {})
@@ -32,15 +32,18 @@ describe IpamPlugin do
     end
   end
 
-  describe '/Plugin.Activate' do
+  describe '/Plugin.Activate', :etcd => true do
     it 'implements IpamDriver' do
-      expect(Subnet).to receive(:mkdir).with(no_args)
-      expect(AddressPool).to receive(:mkdir).with(no_args)
-      expect(Address).to receive(:mkdir).with(no_args)
-
       data = api_post '/Plugin.Activate', nil
 
       expect(data).to eq({ 'Implements' => ['IpamDriver'] })
+
+      expect(etcd_server.list).to eq [
+        '/kontena/ipam/',
+        '/kontena/ipam/addresses/',
+        '/kontena/ipam/pools/',
+        '/kontena/ipam/subnets/',
+      ].to_set
     end
   end
 
@@ -78,102 +81,326 @@ describe IpamPlugin do
       expect(data).to eq('Error' => "Invalid address")
     end
 
-    it 'accepts with only the required parameters' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: nil, iprange: nil, ipv6: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
+    context 'with etcd being empty', :etcd => true do
+      it 'creates a new dynamic pool with only the required parameters' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'} }
 
-      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}}
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        })
+      end
+
+      it 'creates a new dynamic pool with empty parameter values' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}, 'Pool' => '', 'SubPool' => ''}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        })
+      end
+
+      it 'creates a new static pool using the given pool' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16' },
+          '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
+        })
+      end
+
+      it 'creates a new static pool using the given iprange' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16', 'SubPool' => '10.81.127.0/17'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'iprange' => '10.81.127.0/17' },
+          '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
+        })
+      end
     end
 
-    it 'accepts with an empty optional param' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'test', subnet: '', iprange: '', ipv6: nil).and_return(AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24')))
+    context 'with etcd having an existing test network', :etcd => true do
+      before do
+        etcd_server.load!(
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        )
+      end
 
-      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}, 'Pool' => '', 'SubPool' => ''}
+      it 'gets the existing pool' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test1'} }
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
-    end
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('PoolID' => 'test1', 'Pool' => '10.80.0.0/24', 'Data' => {})
 
-    it 'accepts with an optional pool' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: nil, ipv6: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        })
+      end
 
-      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16'}
+      it 'allocates dynamic addresses to avoid reservations' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test2'} }
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.80.0.0/16', 'Data' => {})
-    end
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('PoolID' => 'test2', 'Pool' => '10.80.1.0/24', 'Data' => {})
 
-    it 'accepts with an optional iprange' do
-      expect(AddressPools::Request).to receive(:run!).with(policy: policy, network: 'kontena', subnet: '10.81.0.0/16', iprange: '10.81.127.0/17', ipv6: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16')))
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.1.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+        })
+      end
 
-      data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16', 'SubPool' => '10.81.127.0/17'}
+      it 'fails on a configuration conflict' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test1'}, 'Pool' => '10.80.1.0/24' }
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.80.0.0/16', 'Data' => {})
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "pool test1 exists with subnet 10.80.0.0, requested 10.80.1.0")
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        })
+      end
+
+      it 'fails on a subnet conflict' do
+        data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test2'}, 'Pool' => '10.64.0.0/10' }
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "10.64.0.0 conflict: Conflict with network 10.80.0.0/24")
+
+        expect(etcd_server.logs).to eq [
+          [:get, '/kontena/ipam/pools/test2'],
+          [:set, '/kontena/ipam/subnets/10.64.0.0'],
+          [:get, '/kontena/ipam/subnets'],
+          [:delete, '/kontena/ipam/subnets/10.64.0.0',]
+        ] if etcd_server.logs # TODO: implement for Etcd::TestServer
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        })
+      end
     end
   end
 
   describe '/IpamDriver.RequestAddress' do
-    let :pool do
-      AddressPool.new('test', subnet: IPAddr.new('10.80.0.0/24'))
+    context 'with etcd being empty', :etcd => true do
+      it 'fails for a nonexistant pool' do
+        data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test'}
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "Pool not found: test")
+      end
     end
 
-    let :addr1 do
-      Address.new('test', '10.80.0.1', address: pool.subnet.subnet_addr('10.80.0.1'))
+    context 'with etcd having an existing empty network', :etcd => true do
+      before do
+        etcd_server.load!(
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+        )
+      end
+
+      it 'allocates a dynamic adress' do
+        data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test' }
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data.keys).to eq ['Address', 'Data']
+
+        addr = IPAddr.new(data['Address'])
+        expect(addr.network).to eq(IPAddr.new('10.80.0.0/24'))
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          "/kontena/ipam/addresses/test/#{addr.to_s}" => { 'address' => addr.to_cidr },
+        })
+      end
+
+      it 'allocates a static adress' do
+        data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('Address' => '10.80.0.1/24', 'Data' => {})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
+        })
+      end
     end
-    let :addr63 do
-      Address.new('test', '10.80.0.63', address: pool.subnet.subnet_addr('10.80.0.63'))
-    end
 
-    it 'accepts with only the required parameters' do
-      expect(Addresses::Request).to receive(:run!).with(policy: policy, pool_id: 'test', address: nil).and_return(addr63)
-      data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test'}
+    context 'with etcd having an existing network with allocated addresses', :etcd => true do
+      before do
+        etcd_server.load!(
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
+          '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
+        )
+      end
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('Address' => '10.80.0.63/24', 'Data' => {})
-    end
+      it 'conflicts on an existing static adress' do
+        data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
 
-    it 'accepts with an empty optional params' do
-      expect(Addresses::Request).to receive(:run!).with(policy: policy, pool_id: 'test', address: '').and_return(addr63)
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data['Error']).to match(%r{Allocation conflict for address 10.80.0.1: Create conflict with /kontena/ipam/addresses/test/10.80.0.1@\d+: Key already exists})
 
-      data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => ''}
+        expect(etcd_server).to_not be_modified, etcd_server.logs.inspect
+      end
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('Address' => '10.80.0.63/24', 'Data' => {})
-    end
+      it 'allocates a dynamic adress' do
+        data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test' }
 
-    it 'accepts with an optional params' do
-      expect(Addresses::Request).to receive(:run!).with(policy: policy, pool_id: 'test', address: '10.80.0.1').and_return(addr1)
+        expect(last_response).to be_ok, last_response.errors
+        expect(data.keys).to eq ['Address', 'Data']
 
-      data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
+        addr = IPAddr.new(data['Address'])
+        expect(addr.network).to eq(IPAddr.new('10.80.0.0/24'))
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq('Address' => '10.80.0.1/24', 'Data' => {})
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
+          '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
+          "/kontena/ipam/addresses/test/#{addr.to_s}" => { 'address' => addr.to_cidr },
+        })
+      end
+
+      it 'allocates a static adress' do
+        data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.2'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq('Address' => '10.80.0.2/24', 'Data' => {})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
+          '/kontena/ipam/addresses/test/10.80.0.2' => { 'address' => '10.80.0.2/24' },
+          '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
+        })
+      end
     end
   end
 
   describe '/IpamDriver.ReleaseAddress' do
-    it 'accepts the required parameters' do
-      # XXX: with netmask or not?
-      expect(Addresses::Release).to receive(:run!).with(pool_id: 'test', address: '10.80.0.63/24').and_return(nil)
+    context 'with etcd having an existing network with allocated addresses', :etcd => true do
+      before do
+        etcd_server.load!(
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
+          '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
+        )
+      end
 
-      data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.63/24'}
+      it 'rejects a missing pool param' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'Address' => '10.80.2.100'}
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq({})
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "Pool can't be nil")
+      end
+
+      it 'rejects a missing address param' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test' }
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "Address can't be nil")
+      end
+
+      it 'rejects an invalid address' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test2', 'Address' => '10.80.2.265'}
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "invalid address")
+      end
+
+      it 'rejects for a nonexistant pool' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test2', 'Address' => '10.80.2.100'}
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "AddressPool not found: test2")
+      end
+
+      it 'rejects an address outside of the pool' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.2.100'}
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "Address 10.80.2.100 outside of pool subnet 10.80.0.0")
+      end
+
+      it 'ignores release for a nonexistant address' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.2'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({})
+      end
+
+      it 'releases one of the addresses' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.100'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
+        })
+      end
     end
   end
 
   describe '/IpamDriver.ReleasePool' do
-    it 'accepts the required parameters' do
-      expect(AddressPools::Release).to receive(:run!).with(pool_id: 'test').and_return(nil)
+    context 'with etcd having an existing network with allocated addresses', :etcd => true do
+      before do
+        etcd_server.load!(
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/subnets/10.80.2.0' => { 'address' => '10.80.2.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
+          '/kontena/ipam/addresses/test2/10.80.2.1' => { 'address' => '10.80.2.1/24' },
+        )
+      end
 
-      data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test' }
+      it 'rejects for a nonexistant pool' do
+        data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test' }
 
-      expect(last_response).to be_ok, last_response.errors
-      expect(data).to eq({})
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "AddressPool not found: test")
+      end
+
+      it 'releases the pool' do
+        data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test1' }
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({})
+
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.2.0' => { 'address' => '10.80.2.0/24' },
+          '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
+          '/kontena/ipam/addresses/test2/10.80.2.1' => { 'address' => '10.80.2.1/24' },
+        })
+      end
     end
   end
 end
