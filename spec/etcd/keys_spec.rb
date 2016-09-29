@@ -1,10 +1,10 @@
 describe Etcd::Keys do
-  class MockEtcd
+  class MockEtcdKeys
     include Etcd::Keys
   end
 
   let :etcd do
-    MockEtcd.new
+    MockEtcdKeys.new
   end
 
   it 'returns nodes' do

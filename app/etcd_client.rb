@@ -27,6 +27,15 @@ class EtcdClient < Etcd::Client
     @version ||= JSON.parse(api_execute('/version', :get).body)
   end
 
+  # Monkey-patch to fix missing Content-Type for body
+  def build_http_request(klass, path, params = nil, body = nil)
+    req = super
+    if body
+      req['Content-Type'] = 'application/x-www-form-urlencoded'
+    end
+    return req
+  end
+
   # Format Etcd::Error for logging
   #
   # @param op [Symbol] request operation
