@@ -44,7 +44,7 @@ describe EtcdModel do
   end
 
   let :etcd do
-    etcd = double(:etcd)
+    instance_double(EtcdClient)
   end
 
   before do
@@ -127,7 +127,7 @@ describe EtcdModel do
       end
 
       it 'returns object loaded from etcd' do
-        expect(etcd).to receive(:get).with('/test/test1').and_return(double(value: '{"field":"value"}'))
+        expect(etcd).to receive(:get).with('/test/test1').and_return(instance_double(Etcd::Response, value: '{"field":"value"}'))
 
         expect(TestEtcd.get('test1')).to eq TestEtcd.new('test1', field: "value")
       end
@@ -156,7 +156,7 @@ describe EtcdModel do
 
       it 'returns existing object loaded from etcd' do
         expect(etcd).to receive(:set).with('/test/test1', prevExist: false, value: '{"field":"value 1"}').and_raise(Etcd::NodeExist)
-        expect(etcd).to receive(:get).with('/test/test1').and_return(double(value: '{"field":"value 2"}'))
+        expect(etcd).to receive(:get).with('/test/test1').and_return(instance_double(Etcd::Response, value: '{"field":"value 2"}'))
 
         expect(TestEtcd.create_or_get('test1', field: "value 1")).to eq TestEtcd.new('test1', field: "value 2")
       end
@@ -171,9 +171,9 @@ describe EtcdModel do
     end
 
     it 'lists from etcd' do
-      expect(etcd).to receive(:get).with('/test/').and_return(double(children: [
-        double(key: '/test/test1', value: '{"field":"value 1"}', directory?: false),
-        double(key: '/test/test2', value: '{"field":"value 2"}', directory?: false),
+      expect(etcd).to receive(:get).with('/test/').and_return(instance_double(Etcd::Response, children: [
+        instance_double(Etcd::Node, key: '/test/test1', value: '{"field":"value 1"}', directory?: false),
+        instance_double(Etcd::Node, key: '/test/test2', value: '{"field":"value 2"}', directory?: false),
 
       ]))
 
@@ -252,17 +252,17 @@ describe EtcdModel do
     end
 
     it 'lists recursively from etcd' do
-      expect(etcd).to receive(:get).with('/test/').and_return(double(children: [
-        double(key: '/test/test1', directory?: true),
-        double(key: '/test/test2', directory?: true),
+      expect(etcd).to receive(:get).with('/test/').and_return(instance_double(Etcd::Response, children: [
+        instance_double(Etcd::Node, key: '/test/test1', directory?: true),
+        instance_double(Etcd::Node, key: '/test/test2', directory?: true),
       ]))
-      expect(etcd).to receive(:get).with('/test/test1/children/').and_return(double(children: [
-        double(key: '/test/test1/children/childA', value: '{"field":"value 1A"}', directory?: false),
-        double(key: '/test/test1/children/childB', value: '{"field":"value 1B"}', directory?: false),
+      expect(etcd).to receive(:get).with('/test/test1/children/').and_return(instance_double(Etcd::Response, children: [
+        instance_double(Etcd::Node, key: '/test/test1/children/childA', value: '{"field":"value 1A"}', directory?: false),
+        instance_double(Etcd::Node, key: '/test/test1/children/childB', value: '{"field":"value 1B"}', directory?: false),
       ]))
-      expect(etcd).to receive(:get).with('/test/test2/children/').and_return(double(children: [
-        double(key: '/test/test2/children/childA', value: '{"field":"value 2A"}', directory?: false),
-        double(key: '/test/test2/children/childB', value: '{"field":"value 2B"}', directory?: false),
+      expect(etcd).to receive(:get).with('/test/test2/children/').and_return(instance_double(Etcd::Response, children: [
+        instance_double(Etcd::Node, key: '/test/test2/children/childA', value: '{"field":"value 2A"}', directory?: false),
+        instance_double(Etcd::Node, key: '/test/test2/children/childB', value: '{"field":"value 2B"}', directory?: false),
       ]))
 
       expect(TestEtcdChild.list()).to eq [
@@ -274,9 +274,9 @@ describe EtcdModel do
     end
 
     it 'lists etcd' do
-      expect(etcd).to receive(:get).with('/test/test1/children/').and_return(double(children: [
-        double(key: '/test/test1/children/childA', value: '{"field":"value 1A"}', directory?: false),
-        double(key: '/test/test1/children/childB', value: '{"field":"value 1B"}', directory?: false),
+      expect(etcd).to receive(:get).with('/test/test1/children/').and_return(instance_double(Etcd::Response, children: [
+        instance_double(Etcd::Node, key: '/test/test1/children/childA', value: '{"field":"value 1A"}', directory?: false),
+        instance_double(Etcd::Node, key: '/test/test1/children/childB', value: '{"field":"value 1B"}', directory?: false),
       ]))
 
       expect(TestEtcdChild.list('test1')).to eq [

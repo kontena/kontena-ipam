@@ -1,6 +1,6 @@
 describe AddressPool do
   let :etcd do
-    double(:etcd)
+    instance_double(EtcdClient)
   end
 
   before do
@@ -9,8 +9,8 @@ describe AddressPool do
 
   it 'creates objects in etcd' do
     expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.0.0', prevExist: false, value: '{"address":"10.81.0.0/16"}')
-    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
     ]))
     expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
     expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
@@ -19,8 +19,8 @@ describe AddressPool do
   end
 
   it 'lists objects in etcd' do
-    expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/pools/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+        instance_double(Etcd::Node, key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
     ]))
 
     expect(described_class.list).to eq [
@@ -30,7 +30,7 @@ describe AddressPool do
 
   it 'gets objects in etcd' do
     expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(
-        double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
+        instance_double(Etcd::Node, key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.81.0.0/16"}'),
     )
 
     expect(described_class.get('kontena')).to eq(
@@ -41,8 +41,8 @@ describe AddressPool do
   describe '#create_or_get' do
     it 'stores new object to etcd' do
       expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.0.0', prevExist: false, value: '{"address":"10.81.0.0/16"}')
-      expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+      expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+        instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
       ]))
       expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
@@ -52,14 +52,14 @@ describe AddressPool do
 
     it 'loads existing object from etcd' do
       expect(etcd).to receive(:set).with('/kontena/ipam/subnets/10.81.0.0', prevExist: false, value: '{"address":"10.81.0.0/16"}')
-      expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/subnets/10.80.0.0', directory?: false, value: '{"address": "10.80.0.0/16"}'),
-        double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+      expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+        instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.80.0.0', directory?: false, value: '{"address": "10.80.0.0/16"}'),
+        instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
       ]))
 
       expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}').and_raise(Etcd::NodeExist)
       expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(
-          double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.80.0.0/16"}'),
+          instance_double(Etcd::Node, key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.80.0.0/16"}'),
       )
 
       # yes, it returns with a different subnet
@@ -68,10 +68,10 @@ describe AddressPool do
   end
 
   it 'lists reserved subnets from etcd' do
-    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
-      double(key: '/kontena/ipam/subnets/10.0.0.0', directory?: false, value: '{"address": "10.80.0.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.0.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
-      double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
+    expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.0.0.0', directory?: false, value: '{"address": "10.80.0.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.0.1.0', directory?: false, value: '{"address": "10.80.1.0/24"}'),
+      instance_double(Etcd::Node, key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
     ]))
 
     expect(described_class.reserved_subnets.addrs).to eq [
@@ -97,7 +97,7 @@ describe AddressPool do
 
     it 'gets an address from etcd' do
       expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/10.81.0.1').and_return(
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
+        instance_double(Etcd::Node, key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
       )
 
       addr = subject.get_address(IPAddr.new('10.81.0.1'))
@@ -116,8 +116,8 @@ describe AddressPool do
     end
 
     it 'lists addresses from etcd' do
-      expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
+      expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+        instance_double(Etcd::Node, key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
       ]))
 
       addrs = subject.list_addresses
@@ -129,8 +129,8 @@ describe AddressPool do
     end
 
     it 'lists reserved addresses from etcd' do
-      expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
+      expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+        instance_double(Etcd::Node, key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
       ]))
 
       ipset = subject.reserved_addresses
@@ -163,7 +163,7 @@ describe AddressPool do
 
     describe '#available_addresses' do
       it 'returns the reduced subnet pool' do
-        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: []))
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
 
         addresses = subject.available_addresses
 
@@ -175,8 +175,8 @@ describe AddressPool do
       end
 
       it 'excludes reserved addresses from the reduced subnet pool' do
-        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: [
-          double(key: '/kontena/ipam/addresses/kontena/10.80.0.1', directory?: false, value: '{"address": "10.80.0.1/24"}'),
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: [
+          instance_double(Etcd::Node, key: '/kontena/ipam/addresses/kontena/10.80.0.1', directory?: false, value: '{"address": "10.80.0.1/24"}'),
         ]))
 
         addresses = subject.available_addresses
@@ -233,7 +233,7 @@ describe AddressPool do
 
     describe '#available_addresses' do
       it 'returns the full iprange pool' do
-        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: []))
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
 
         addresses = subject.available_addresses
 
@@ -244,8 +244,8 @@ describe AddressPool do
       end
 
       it 'excludes reserved addresses from the full iprange pool' do
-        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: reserved.map{|a|
-          double(key: "/kontena/ipam/addresses/test/#{a.to_s}", directory?: false, value: {'address' => a}.to_json)
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: reserved.map{|a|
+          instance_double(Etcd::Node, key: "/kontena/ipam/addresses/test/#{a.to_s}", directory?: false, value: {'address' => a}.to_json)
         }))
 
         expect(subject.available_addresses).to eq available
@@ -267,7 +267,7 @@ describe AddressPool do
 
     describe '#available_addresses' do
       it 'returns the reduced iprange' do
-        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(double(directory?: true, children: []))
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
 
         addresses = subject.available_addresses
 

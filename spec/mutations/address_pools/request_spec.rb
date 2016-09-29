@@ -1,6 +1,6 @@
 describe AddressPools::Request do
   let :policy do
-    double(:policy,
+    instance_double(Policy,
       supernet: IPAddr.new('10.80.0.0/16'),
     )
   end
