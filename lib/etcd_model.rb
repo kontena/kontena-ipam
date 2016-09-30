@@ -271,14 +271,14 @@ module EtcdModel
     # @return [EtcdModel] stored instance
     def create_or_get(*key, **attrs)
       begin
-        object = new(*key, **attrs)
-        object.create!
+        object = create(*key, **attrs)
         object
-      rescue Etcd::NodeExist => error
+      rescue const_get(:Conflict) => error
+        object = new(*key, **attrs)
         object.get!
         object
       end
-    rescue Etcd::KeyNotFound
+    rescue Etcd::KeyNotFound => error
       raise const_get(:Conflict), "Create-and-Delete conflict with #{error.cause}@#{error.index}: #{error.message}"
     end
 

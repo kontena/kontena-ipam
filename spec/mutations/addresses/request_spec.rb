@@ -87,7 +87,7 @@ describe Addresses::Request do
 
   context 'when not using iprange' do
     let :pool do
-      AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
+      AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), gateway: IPAddr.new('10.81.0.1/16'))
     end
 
     let :subject do
@@ -105,8 +105,8 @@ describe Addresses::Request do
         addr = Address.new('kontena', '10.81.100.100', address: pool.subnet.subnet_addr('10.81.100.100'))
         expect(addr.address.to_cidr).to eq '10.81.100.100/16'
 
-        expect(pool).to receive(:reserved_addresses).and_return(IPSet.new([]))
-        expect(policy).to receive(:allocate_address).with((IPAddr.new('10.81.0.1/16')..IPAddr.new('10.81.255.254/16')).to_a).and_return(IPAddr.new('10.81.100.100/16'))
+        expect(pool).to receive(:reserved_addresses).and_return(IPSet.new([IPAddr.new('10.81.0.1/16').to_host]))
+        expect(policy).to receive(:allocate_address).with((IPAddr.new('10.81.0.2/16')..IPAddr.new('10.81.255.254/16')).to_a).and_return(IPAddr.new('10.81.100.100/16'))
         expect(Address).to receive(:create).with('kontena', '10.81.100.100', address: IPAddr.new('10.81.100.100/16')).and_return(addr)
 
         outcome = subject.run
