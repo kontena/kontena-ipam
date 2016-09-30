@@ -5,8 +5,9 @@ class AddressPool
   etcd_path '/kontena/ipam/pools/:id'
   json_attr :subnet, type: IPAddr
   json_attr :iprange, type: IPAddr, omitnil: true
+  json_attr :gateway, type: IPAddr
 
-  attr_accessor :id, :subnet, :iprange
+  attr_accessor :id, :subnet, :iprange, :gateway
 
   # Return currently reserved subnets
   #
@@ -22,6 +23,8 @@ class AddressPool
   # @see Subnet
   def create!
     Subnet.reserve(@subnet)
+    # use the first host address as gateway
+    @gateway = allocation_range.first(2)[1]
     super
     Address.mkdir(@id)
   end
@@ -71,7 +74,7 @@ class AddressPool
   #
   # @return [IPSet]
   def reserved_addresses
-    IPSet.new(list_addresses.map{|a| a.address.to_host })
+    IPSet.new(list_addresses.map{|a| a.address.to_host } + [@gateway])
   end
 
   # Compute available addresses for allocation within pool

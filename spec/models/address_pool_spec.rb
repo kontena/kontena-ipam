@@ -12,10 +12,10 @@ describe AddressPool do
     expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
       double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
     ]))
-    expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
+    expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}')
     expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
 
-    expect(described_class.create('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"))
+    expect(described_class.create('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"), gateway: IPAddr.new('10.81.0.1/16'))
   end
 
   it 'lists objects in etcd' do
@@ -44,10 +44,10 @@ describe AddressPool do
       expect(etcd).to receive(:get).with('/kontena/ipam/subnets/').and_return(double(directory?: true, children: [
         double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
       ]))
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}')
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
 
-      expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"))
+      expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"), gateway: IPAddr.new("10.81.0.1/16"))
     end
 
     it 'loads existing object from etcd' do
@@ -57,7 +57,7 @@ describe AddressPool do
         double(key: '/kontena/ipam/subnets/10.81.0.0', directory?: false, value: '{"address": "10.81.0.0/16"}'),
       ]))
 
-      expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16"}').and_raise(Etcd::NodeExist)
+      expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}').and_raise(Etcd::NodeExist)
       expect(etcd).to receive(:get).with('/kontena/ipam/pools/kontena').and_return(
           double(key: '/kontena/ipam/pools/kontena', directory?: false, value: '{"subnet": "10.80.0.0/16"}'),
       )
@@ -83,7 +83,7 @@ describe AddressPool do
 
   context 'for a AddressPool' do
     let :subject do
-      described_class.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: '10.81.128.0/17')
+      described_class.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: '10.81.128.0/17', gateway: IPAddr.new('10.81.0.1'))
     end
 
     it 'creates an address' do
@@ -130,12 +130,13 @@ describe AddressPool do
 
     it 'lists reserved addresses from etcd' do
       expect(etcd).to receive(:get).with('/kontena/ipam/addresses/kontena/').and_return(double(directory?: true, children: [
-        double(key: '/kontena/ipam/addresses/kontena/10.81.0.1', directory?: false, value: '{"address": "10.81.0.1/16"}'),
+        double(key: '/kontena/ipam/addresses/kontena/10.81.0.2', directory?: false, value: '{"address": "10.81.0.2/16"}'),
       ]))
 
       ipset = subject.reserved_addresses
       expect(ipset.addrs).to eq [
         IPAddr.new('10.81.0.1'),
+        IPAddr.new('10.81.0.2'),
       ]
       expect(ipset.addrs.first.to_cidr).to eq '10.81.0.1/32'
     end
@@ -151,7 +152,7 @@ describe AddressPool do
 
   context 'for an AddressPool without an iprange' do
     let :subject do
-      described_class.new('test', subnet: IPAddr.new('10.80.0.0/24'))
+      described_class.new('test', subnet: IPAddr.new('10.80.0.0/24'), gateway: IPAddr.new('10.80.0.1'))
     end
 
     describe '#allocation_range' do
@@ -167,10 +168,10 @@ describe AddressPool do
 
         addresses = subject.available_addresses
 
-        expect(addresses.first).to eq IPAddr.new('10.80.0.1/24')
-        expect(addresses).to eq (IPAddr.new('10.80.0.1/24')..IPAddr.new('10.80.0.254/24')).to_a
+        expect(addresses.first).to eq IPAddr.new('10.80.0.2/24')
+        expect(addresses).to eq (IPAddr.new('10.80.0.2/24')..IPAddr.new('10.80.0.254/24')).to_a
         expect(addresses.last).to eq IPAddr.new('10.80.0.254/24')
-        expect(addresses.size).to eq(254)
+        expect(addresses.size).to eq(253)
 
       end
 
@@ -190,7 +191,7 @@ describe AddressPool do
 
   context 'for an AddressPool with an iprange' do
     let :subject do
-      AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.1.0/29'))
+      AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.1.0/29'), gateway: IPAddr.new('10.81.1.1'))
     end
 
     let :addresses do
@@ -216,7 +217,7 @@ describe AddressPool do
     let :available do
       [
         IPAddr.new('10.81.1.0/16'),
-        IPAddr.new('10.81.1.1/16'),
+        #IPAddr.new('10.81.1.1/16'), gw address not available
         IPAddr.new('10.81.1.4/16'),
         IPAddr.new('10.81.1.5/16'),
         IPAddr.new('10.81.1.6/16'),
@@ -238,9 +239,11 @@ describe AddressPool do
         addresses = subject.available_addresses
 
         expect(addresses.first).to eq IPAddr.new('10.81.1.0/16')
-        expect(addresses).to eq (IPAddr.new('10.81.1.0/16')..IPAddr.new('10.81.1.7/16')).to_a
+        expected_addresses = (IPAddr.new('10.81.1.0/16')..IPAddr.new('10.81.1.7/16')).to_a
+        expected_addresses.delete_at(1)
+        expect(addresses).to eq expected_addresses
         expect(addresses.last).to eq IPAddr.new('10.81.1.7/16')
-        expect(addresses.size).to eq 8
+        expect(addresses.size).to eq 7
       end
 
       it 'excludes reserved addresses from the full iprange pool' do
@@ -255,7 +258,7 @@ describe AddressPool do
 
   context 'for an AddressPool with an iprange at the edge of the subnet' do
     let :subject do
-      AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.0.0/24'))
+      AddressPool.new('test', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.0.0/24'), gateway: IPAddr.new('10.81.0.1'))
     end
 
     describe '#allocation_range' do
@@ -271,10 +274,10 @@ describe AddressPool do
 
         addresses = subject.available_addresses
 
-        expect(addresses.first).to eq IPAddr.new('10.81.0.1/16')
-        expect(addresses).to eq (IPAddr.new('10.81.0.1/16')..IPAddr.new('10.81.0.255/16')).to_a
+        expect(addresses.first).to eq IPAddr.new('10.81.0.2/16')
+        expect(addresses).to eq (IPAddr.new('10.81.0.2/16')..IPAddr.new('10.81.0.255/16')).to_a
         expect(addresses.last).to eq IPAddr.new('10.81.0.255/16')
-        expect(addresses.size).to eq 255
+        expect(addresses.size).to eq 254
       end
     end
   end
