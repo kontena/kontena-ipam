@@ -83,17 +83,18 @@ describe AddressPool do
     ]
   end
 
-  context 'for a AddressPool' do
+  context 'for an AddressPool' do
     let :subject do
       described_class.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: '10.81.128.0/17', gateway: IPAddr.new('10.81.0.1/16'))
     end
 
     it 'creates an address' do
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16"}')
+      expect(subject).to receive(:node).and_return('somehost')
+      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')
 
       addr = subject.create_address(IPAddr.new('10.81.0.1'))
 
-      expect(addr).to eq Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1/16'))
+      expect(addr).to eq Address.new('kontena', '10.81.0.1', node: 'somehost', address: IPAddr.new('10.81.0.1/16'))
       expect(addr.address.to_cidr).to eq '10.81.0.1/16'
     end
 

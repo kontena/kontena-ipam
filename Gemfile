@@ -5,6 +5,7 @@ gem 'sinatra-contrib'
 gem 'etcd'
 gem 'mutations'
 gem 'thin', require: false
+gem 'docker-api'
 
 group :development, :test do
   gem 'rake', require: false
