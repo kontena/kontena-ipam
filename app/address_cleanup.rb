@@ -32,7 +32,7 @@ class AddressCleanup
       pool.list_addresses.each { |address|
         debug "checking address: #{address.address.to_host}..."
         if address.node == @node
-          # TODO Uncomment the gateway part when gateway stuff merget into master
+          # TODO Uncomment the gateway part when gateway stuff merged into master
           if known_addresses.include?(address.address.to_host) #|| pool.gateway.to_host == address.address.to_host
             debug '..still in use or gateway, skipping.'
             next
@@ -63,7 +63,7 @@ class AddressCleanup
         nw_json.dig('Containers').each { |c, value|
           debug "container: #{c}"
           debug "value: #{value}"
-          address = IPAddr.new(value.dig('IPv4Address')) rescue nil
+          address = IPAddr.new(value.dig('IPv4Address'))
           local_addresses << address if address
         }
       end
