@@ -26,6 +26,8 @@ class Etcd::TestServer < Etcd::ServerBase
     root = @client.get(@root, recursive: true)
 
     walk_node(root, &block)
+  rescue Etcd::KeyNotFound
+    # empty
   end
 
   public
