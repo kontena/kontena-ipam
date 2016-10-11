@@ -127,7 +127,7 @@ describe AddressPools::Request do
         outcome = subject.run
 
         expect(outcome).to_not be_success
-        expect(outcome.errors.symbolic[:subnet]).to eq :allocate
+        expect(outcome.errors.symbolic[:subnet]).to eq :full
       end
     end
 
@@ -151,7 +151,7 @@ describe AddressPools::Request do
         outcome = subject.run
 
         expect(outcome).to_not be_success
-        expect(outcome.errors.symbolic[:subnet]).to eq :config
+        expect(outcome.errors.symbolic[:pool]).to eq :invalid
       end
 
       it 'fails if a network already exists with the same subnet' do
@@ -234,7 +234,7 @@ describe AddressPools::Request do
         outcome = subject.run
 
         expect(outcome).to_not be_success
-        expect(outcome.errors.symbolic[:iprange]).to eq :config
+        expect(outcome.errors.symbolic[:pool]).to eq :invalid
       end
     end
   end

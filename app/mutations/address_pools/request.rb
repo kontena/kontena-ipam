@@ -1,12 +1,4 @@
 module AddressPools
-  class RequestError < RuntimeError
-    attr_reader :param, :sym
-    def initialize(param, sym)
-      @param = param
-      @sym = sym
-    end
-  end
-
   class Request < Mutations::Command
     include Logging
 
@@ -42,12 +34,21 @@ module AddressPools
       else
         info "request dynamic network #{network} pool"
 
-        pool = request_dynamic
+        pool = RetryHelper.with_retry(Subnet::Conflict) {
+           request_dynamic
+        }
       end
 
       return verify(pool)
-    rescue RequestError => error
-      add_error(error.param, error.sym, error.message)
+
+    rescue AddressPool::Full => error
+      add_error(:subnet, :full, error.message)
+
+    rescue AddressPool::Invalid => error
+      add_error(:pool, :invalid, error.message)
+
+    rescue Subnet::Conflict => error
+      add_error(:subnet, :conflict, "#{self.subnet} conflict: #{error}")
     end
 
     # Verify that the requested pool matches the requested configuration.
@@ -58,11 +59,11 @@ module AddressPools
     def verify(pool)
       # existing network created on a remote node
       if self.subnet && pool.subnet != self.subnet
-        raise RequestError.new(:subnet, :config), "pool #{pool.id} exists with subnet #{pool.subnet}, requested #{self.subnet}"
+        raise AddressPool::Invalid, "pool #{pool.id} exists with subnet #{pool.subnet}, requested #{self.subnet}"
       end
 
       if self.iprange && pool.iprange != self.iprange
-        raise RequestError.new(:iprange, :config), "pool #{pool.id} exists with iprange #{pool.iprange}, requested #{self.iprange}"
+        raise AddressPool::Invalid, "pool #{pool.id} exists with iprange #{pool.iprange}, requested #{self.iprange}"
       end
 
       return pool
@@ -70,34 +71,27 @@ module AddressPools
 
     # Request for a network with a statically allocated subnet, with optional iprange.
     #
-    # @raise [RequestError]
+    # @raise [Subnet::Conflict]
     # @return [AddressPool]
     def request_static
       # reserve
       return AddressPool.create_or_get(self.network, subnet: self.subnet, iprange: self.iprange)
-
-    rescue Subnet::Conflict => error
-      raise RequestError.new(:subnet, :conflict), "#{self.subnet} conflict: #{error}"
     end
 
     # Request for a network with a dynamically allocated subnet.
     #
-    # @raise [RequestError]
+    # @raise [Subnet::Conflict]
     # @return [AddressPool]
     def request_dynamic
       reserved = AddressPool.reserved_subnets
 
       # allocate
       unless subnet = policy.allocatable_subnets(reserved).first
-        raise RequestError.new(:subnet, :allocate), "supernet #{policy.supernet} is exhausted"
+        raise AddressPool::Full, "supernet #{policy.supernet} is exhausted"
       end
 
       # reserve
       return AddressPool.create_or_get(self.network, subnet: subnet)
-
-    rescue Subnet::Conflict => error
-      warn "retry on subnet conflict: #{error}"
-      retry
     end
   end
 end
