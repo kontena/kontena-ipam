@@ -40,14 +40,14 @@ class Etcd::ServerBase
   #
   # @return [Boolean]
   def modified?
-    !@logs.empty?
+    fail NotImplementedError
   end
 
   # Operation log
   #
   # @return [Array<Symbol, String>] operation, key pairs
   def logs
-    @logs
+    fail NotImplementedError
   end
 
   # List all keys, including the root, any dirs, and any nodes.

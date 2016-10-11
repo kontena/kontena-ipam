@@ -157,8 +157,11 @@ class Etcd::FakeServer < Etcd::ServerBase
   end
 
   # Log an operation
-  def log!(op, key)
-    @logs << [op, key]
+  def log!(action, node)
+    path = node.key
+    path += '/' if node.directory?
+
+    @logs << [action, path]
   end
 
   def modified!
@@ -218,8 +221,6 @@ class Etcd::FakeServer < Etcd::ServerBase
   def get(key, recursive: nil)
     key, node = read(key)
 
-    log! :get, key
-
     if node
       return {
         'action' => 'get',
@@ -233,8 +234,6 @@ class Etcd::FakeServer < Etcd::ServerBase
   def set(key, prevExist: nil, dir: nil, value: nil)
     key, node = read(key)
 
-    log! :set, key
-
     if prevExist == false && node
       raise Error.new(412, 105, key), "Key already exists"
     elsif prevExist == true && !node
@@ -243,17 +242,21 @@ class Etcd::FakeServer < Etcd::ServerBase
       raise Error.new(403, 102, key), "Not a file"
     end
 
+    action = node ? :set : :create
+
     set_node = if dir
       Node.new(key, nodes: {})
     else
       Node.new(key, value: value)
     end
 
+    log! action, set_node
+
     write set_node
     modified!
 
     return {
-      'action' => 'set',
+      'action' => action,
       'node' => set_node,
       'prevNode' => node,
     }
@@ -261,9 +264,6 @@ class Etcd::FakeServer < Etcd::ServerBase
 
   def delete(key, recursive: nil, dir: nil)
     key, node = read(key)
-
-    log! :delete, key
-
     if !node
       raise Error.new(404, 100, key), "Key not found"
     #elsif dir && !node.directory?
@@ -273,6 +273,8 @@ class Etcd::FakeServer < Etcd::ServerBase
     elsif node.directory? && dir && !node.children.empty? && !recursive
       raise Error.new(403, 108, key), "Directory not empty"
     end
+
+    log! :delete, node
 
     remove(node)
     modified!
