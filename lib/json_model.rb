@@ -89,15 +89,24 @@ module JSONModel
     end
   end
 
-  # Compare equality of JSON attributes
-  def eq_json(other)
+  # Compare equality of JSON attributes, per the <=> operator
+  # @return [Integer] <0, 0, >0
+  def cmp_json(other)
     self.class.json_attrs.each do |sym, json_attr|
       self_value = self.instance_variable_get("@#{sym}")
       other_value = other.instance_variable_get("@#{sym}")
 
-      return false if self_value != other_value
+      if self_value.nil? && other_value.nil?
+        next
+      elsif self_value.nil?
+        return -1
+      elsif other_value.nil?
+        return +1
+      elsif self_value != other_value
+        return self_value <=> other_value
+      end
     end
-    return true
+    return 0
   end
 
   # Serialize to encoded JSON object

@@ -84,26 +84,32 @@ describe EtcdModel do
     end
 
     context 'with only key values' do
-      it 'compares equal' do
-        expect(TestEtcd.new('test1')).to eq TestEtcd.new('test1')
+      it 'compares the key' do
+        expect(TestEtcd.new('test1') <=> TestEtcd.new('test2')).to eq(-1)
+        expect(TestEtcd.new('test1') <=> TestEtcd.new('test1')).to eq(0)
+        expect(TestEtcd.new('test2') <=> TestEtcd.new('test1')).to eq(1)
       end
 
-      it 'compares unequal' do
-        expect(TestEtcd.new('test1')).to_not eq TestEtcd.new('test1', field: "value 1")
-        expect(TestEtcd.new('test1')).to_not eq TestEtcd.new('test2')
+      it 'sorts before values' do
+        expect(TestEtcd.new('test1') <=> TestEtcd.new('test1', field: "value 1")).to eq(-1)
       end
     end
 
     context 'with key and attr values' do
-      it 'compares equal' do
-        expect(TestEtcd.new('test1', field: "value 1")).to eq TestEtcd.new('test1', field: "value 1")
+      it 'compares the keys' do
+        expect(TestEtcd.new('test1', field: "value") <=> TestEtcd.new('test2', field: "value")).to eq(-1)
+        expect(TestEtcd.new('test1', field: "value") <=> TestEtcd.new('test1', field: "value")).to eq(0)
+        expect(TestEtcd.new('test2', field: "value") <=> TestEtcd.new('test1', field: "value")).to eq(+1)
       end
 
-      it 'compares unequal' do
-        expect(TestEtcd.new('test1', field: "value 1")).to_not eq TestEtcd.new('test1')
-        expect(TestEtcd.new('test1', field: "value 1")).to_not eq TestEtcd.new('test1', field: "value 2")
-        expect(TestEtcd.new('test1', field: "value 1")).to_not eq TestEtcd.new('test2')
-        expect(TestEtcd.new('test1', field: "value 1")).to_not eq TestEtcd.new('test2', field: "value 2")
+      it 'compares the values with matching keys' do
+        expect(TestEtcd.new('test1', field: "value 1") <=> TestEtcd.new('test1', field: "value 2")).to eq(-1)
+        expect(TestEtcd.new('test1', field: "value 1") <=> TestEtcd.new('test1', field: "value 1")).to eq(0)
+        expect(TestEtcd.new('test1', field: "value 2") <=> TestEtcd.new('test1', field: "value 1")).to eq(+1)
+      end
+
+      it 'sorts after missing values' do
+        expect(TestEtcd.new('test1', field: "value") <=> TestEtcd.new('test1')).to eq(+1)
       end
     end
 
@@ -177,7 +183,7 @@ describe EtcdModel do
 
       ]))
 
-      expect(TestEtcd.list()).to eq [
+      expect(TestEtcd.list().sort).to eq [
         TestEtcd.new('test1', field: "value 1"),
         TestEtcd.new('test2', field: "value 2"),
       ]
