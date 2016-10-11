@@ -38,6 +38,7 @@ describe IpamPlugin do
 
       expect(data).to eq({ 'Implements' => ['IpamDriver'] })
 
+      expect(etcd_server).to be_modified
       expect(etcd_server.list).to eq [
         '/kontena/ipam/',
         '/kontena/ipam/addresses/',
@@ -88,6 +89,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
@@ -100,6 +102,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
@@ -112,6 +115,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16' },
           '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
@@ -124,6 +128,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'iprange' => '10.81.127.0/17' },
           '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
@@ -145,10 +150,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'test1', 'Pool' => '10.80.0.0/24', 'Data' => {})
 
-        expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
-          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-        })
+        expect(etcd_server).to_not be_modified
       end
 
       it 'allocates dynamic addresses to avoid reservations' do
@@ -157,6 +159,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'test2', 'Pool' => '10.80.1.0/24', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.1.0/24' },
@@ -171,10 +174,7 @@ describe IpamPlugin do
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "pool test1 exists with subnet 10.80.0.0, requested 10.80.1.0")
 
-        expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
-          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-        })
+        expect(etcd_server).to_not be_modified
       end
 
       it 'fails on a subnet conflict' do
@@ -183,17 +183,15 @@ describe IpamPlugin do
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "10.64.0.0 conflict: Conflict with network 10.80.0.0/24")
 
-        expect(etcd_server.logs).to eq [
-          [:get, '/kontena/ipam/pools/test2'],
-          [:set, '/kontena/ipam/subnets/10.64.0.0'],
-          [:get, '/kontena/ipam/subnets'],
-          [:delete, '/kontena/ipam/subnets/10.64.0.0',]
-        ] if etcd_server.logs # TODO: implement for Etcd::TestServer
-
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
+        expect(etcd_server.logs).to eq [
+          [:create, '/kontena/ipam/subnets/10.64.0.0'],
+          [:delete, '/kontena/ipam/subnets/10.64.0.0',]
+        ]
       end
     end
   end
@@ -205,6 +203,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "Pool not found: test")
+
+        expect(etcd_server).to_not be_modified
       end
     end
 
@@ -225,6 +225,7 @@ describe IpamPlugin do
         addr = IPAddr.new(data['Address'])
         expect(addr.network).to eq(IPAddr.new('10.80.0.0/24'))
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
@@ -238,6 +239,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('Address' => '10.80.0.1/24', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
@@ -274,6 +276,7 @@ describe IpamPlugin do
         addr = IPAddr.new(data['Address'])
         expect(addr.network).to eq(IPAddr.new('10.80.0.0/24'))
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
@@ -289,6 +292,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('Address' => '10.80.0.2/24', 'Data' => {})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
@@ -316,6 +320,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "Pool can't be nil")
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'rejects a missing address param' do
@@ -323,6 +329,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "Address can't be nil")
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'rejects an invalid address' do
@@ -330,6 +338,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "invalid address")
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'rejects for a nonexistant pool' do
@@ -337,6 +347,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "AddressPool not found: test2")
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'rejects an address outside of the pool' do
@@ -344,6 +356,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "Address 10.80.2.100 outside of pool subnet 10.80.0.0")
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'ignores release for a nonexistant address' do
@@ -351,6 +365,8 @@ describe IpamPlugin do
 
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq({})
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'releases one of the addresses' do
@@ -359,6 +375,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq({})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
@@ -387,6 +404,8 @@ describe IpamPlugin do
 
         expect(last_response.status).to eq(400), last_response.errors
         expect(data).to eq('Error' => "AddressPool not found: test")
+
+        expect(etcd_server).to_not be_modified
       end
 
       it 'releases the pool' do
@@ -395,6 +414,7 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq({})
 
+        expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.2.0' => { 'address' => '10.80.2.0/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
