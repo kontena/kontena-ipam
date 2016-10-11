@@ -79,7 +79,11 @@ class Etcd::TestServer < Etcd::ServerBase
   # @param tree [Hash<String, Object or String>]
   def load!(tree)
     load_nodes(tree) do |key, value|
-      response = @client.set(key, value: value)
+      if value == :directory
+        response = @client.set(key, directory: true)
+      else
+        response = @client.set(key, value: value)
+      end
 
       # record initial load index for modfied?
       @etcd_reset = false

@@ -195,9 +195,15 @@ class Etcd::FakeServer < Etcd::ServerBase
   # @param tree [Hash<String, Object or String>]
   def load!(tree)
     load_nodes(tree) do |key, value|
-      write Node.new(key,
-        value: value,
-      )
+      if value == :directory
+        write Node.new(key,
+          nodes: {},
+        )
+      else
+        write Node.new(key,
+          value: value,
+        )
+      end
     end
   end
 
