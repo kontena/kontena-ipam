@@ -141,6 +141,10 @@ describe EtcdModel do
     end
 
     describe '#get' do
+      it 'rejects an empty key' do
+        expect{ TestEtcd.get('') }.to raise_error(ArgumentError)
+      end
+
       it 'returns nil if missing from etcd', :etcd => true do
         expect(etcd).to receive(:get).with('/kontena/ipam/test/test1').and_call_original
 
@@ -160,6 +164,25 @@ describe EtcdModel do
 
         expect(etcd_server).to_not be_modified
       end
+
+      it 'raises Invalid if the etcd node is a directory', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1/' => nil,
+        )
+        expect(etcd).to receive(:get).with('/kontena/ipam/test/test1').and_call_original
+
+        expect{ TestEtcd.get('test1') }.to raise_error(TestEtcd::Invalid)
+      end
+
+      it 'raises Invalid if the etcd node is not JSON', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1' => 'asdf',
+        )
+        expect(etcd).to receive(:get).with('/kontena/ipam/test/test1').and_call_original
+
+        expect{ TestEtcd.get('test1') }.to raise_error(TestEtcd::Invalid, /Invalid JSON value: \d+: unexpected token at 'asdf/)
+      end
+
     end
 
     describe '#create' do
