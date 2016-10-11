@@ -17,18 +17,16 @@ module AddressPools
     end
 
     optional do
-      string :subnet, discard_empty: true
-      string :iprange, discard_empty: true
+      ipaddr :subnet, discard_empty: true
+      ipaddr :iprange, discard_empty: true
     end
 
     def validate
       add_error(:ipv6, :not_supported, 'IPv6 is not supported') if self.ipv6
-      @subnet = IPAddr.new(subnet) if subnet_present? rescue add_error(:subnet, :invalid, "Invalid address")
-      @iprange = IPAddr.new(iprange) if iprange_present? rescue add_error(:iprange, :invalid, "Invalid address")
 
-      if @subnet && @iprange
-        unless @subnet.include?(@iprange)
-          add_error(:iprange, :out_of_pool, "IPRange #{@iprange} outside of pool subnet #{@subnet}")
+      if self.subnet && self.iprange
+        unless self.subnet.include?(self.iprange)
+          add_error(:iprange, :out_of_pool, "IPRange #{self.iprange} outside of pool subnet #{self.subnet}")
         end
       end
     end
@@ -37,8 +35,8 @@ module AddressPools
       if pool = AddressPool.get(self.network)
         info "request existing network #{network} pool with subnet=#{pool.subnet}"
 
-      elsif @subnet
-        info "request static network #{network} pool: subnet=#{@subnet}"
+      elsif self.subnet
+        info "request static network #{network} pool: subnet=#{self.subnet}"
 
         pool = request_static
       else
@@ -59,12 +57,12 @@ module AddressPools
     # @return [AddressPool]
     def verify(pool)
       # existing network created on a remote node
-      if @subnet && pool.subnet != @subnet
-        raise RequestError.new(:subnet, :config), "pool #{pool.id} exists with subnet #{pool.subnet}, requested #{@subnet}"
+      if self.subnet && pool.subnet != self.subnet
+        raise RequestError.new(:subnet, :config), "pool #{pool.id} exists with subnet #{pool.subnet}, requested #{self.subnet}"
       end
 
-      if @iprange && pool.iprange != @iprange
-        raise RequestError.new(:iprange, :config), "pool #{pool.id} exists with iprange #{pool.iprange}, requested #{@iprange}"
+      if self.iprange && pool.iprange != self.iprange
+        raise RequestError.new(:iprange, :config), "pool #{pool.id} exists with iprange #{pool.iprange}, requested #{self.iprange}"
       end
 
       return pool
@@ -76,10 +74,10 @@ module AddressPools
     # @return [AddressPool]
     def request_static
       # reserve
-      return AddressPool.create_or_get(self.network, subnet: @subnet, iprange: @iprange)
+      return AddressPool.create_or_get(self.network, subnet: self.subnet, iprange: self.iprange)
 
     rescue Subnet::Conflict => error
-      raise RequestError.new(:subnet, :conflict), "#{@subnet} conflict: #{error}"
+      raise RequestError.new(:subnet, :conflict), "#{self.subnet} conflict: #{error}"
     end
 
     # Request for a network with a dynamically allocated subnet.

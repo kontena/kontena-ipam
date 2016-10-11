@@ -79,7 +79,7 @@ describe IpamPlugin do
 
       expect(last_response.status).to eq(400), last_response.errors
 
-      expect(data).to eq('Error' => "Invalid address")
+      expect(data).to eq('Error' => "Subnet is invalid")
     end
 
     context 'with etcd being empty', :etcd => true do
@@ -337,7 +337,7 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test2', 'Address' => '10.80.2.265'}
 
         expect(last_response.status).to eq(400), last_response.errors
-        expect(data).to eq('Error' => "invalid address")
+        expect(data).to eq('Error' => "Address is invalid")
 
         expect(etcd_server).to_not be_modified
       end
