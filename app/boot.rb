@@ -12,6 +12,7 @@ require_relative '../lib/json_model'
 require_relative '../lib/etcd/keys_helpers'
 require_relative '../lib/etcd_model'
 require_relative '../lib/mutations/ipaddr_filter'
+require_relative '../lib/helpers.rb'
 
 require_relative 'logging'
 require_relative 'etcd_client'
