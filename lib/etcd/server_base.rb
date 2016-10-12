@@ -10,9 +10,17 @@ class Etcd::ServerBase
 
   def load_nodes(tree)
     for key, value in tree
-      value = value.to_json unless value.is_a? String
+      if key.end_with? '/'
+        key = key.chomp('/')
 
-      yield key, value
+        fail "Value given for directory" if value
+
+        yield key, :directory
+      else
+        value = value.to_json unless value.is_a? String
+
+        yield key, value
+      end
     end
   end
 
@@ -40,14 +48,14 @@ class Etcd::ServerBase
   #
   # @return [Boolean]
   def modified?
-    !@logs.empty?
+    fail NotImplementedError
   end
 
   # Operation log
   #
   # @return [Array<Symbol, String>] operation, key pairs
   def logs
-    @logs
+    fail NotImplementedError
   end
 
   # List all keys, including the root, any dirs, and any nodes.

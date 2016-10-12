@@ -13,9 +13,10 @@ describe JSONModel do
       initialize_json(**attrs)
     end
 
-    def ==(other)
-      self.eq_json(other)
+    def <=>(other)
+      self.cmp_json(other)
     end
+    include Comparable
   end
 
   it 'initializes default attributes' do
@@ -37,17 +38,17 @@ describe JSONModel do
   end
 
   it 'compares equal' do
-    expect(TestJSON.new().eq_json TestJSON.new()).to be true
-    expect(TestJSON.new(str: "string").eq_json TestJSON.new(str: "string")).to be true
-    expect(TestJSON.new(str: "string", int: 5).eq_json TestJSON.new(str: "string", int: 5)).to be true
-    expect(TestJSON.new(str: "string", ipaddr: IPAddr.new("127.0.0.1")).eq_json TestJSON.new(str: "string", ipaddr: IPAddr.new("127.0.0.1"))).to be true
+    expect(TestJSON.new()).to eq TestJSON.new()
+    expect(TestJSON.new(str: "string")).to eq TestJSON.new(str: "string")
+    expect(TestJSON.new(str: "string", int: 5)).to eq TestJSON.new(str: "string", int: 5)
+    expect(TestJSON.new(str: "string", ipaddr: IPAddr.new("127.0.0.1"))).to eq TestJSON.new(str: "string", ipaddr: IPAddr.new("127.0.0.1"))
   end
 
   it 'compares unequal' do
-    expect(TestJSON.new(str: "string").eq_json TestJSON.new()).to be false
-    expect(TestJSON.new(str: "string").eq_json TestJSON.new(str: "different")).to be false
-    expect(TestJSON.new(str: "string").eq_json TestJSON.new(int: 5)).to be false
-    expect(TestJSON.new(str: "test", ipaddr: IPAddr.new("127.0.0.1")).eq_json TestJSON.new(str: "test", ipaddr: IPAddr.new("127.0.0.2"))).to be false
+    expect(TestJSON.new(str: "string")).to_not eq TestJSON.new()
+    expect(TestJSON.new(str: "string")).to_not eq TestJSON.new(str: "different")
+    expect(TestJSON.new(str: "string")).to_not eq TestJSON.new(int: 5)
+    expect(TestJSON.new(str: "test", ipaddr: IPAddr.new("127.0.0.1"))).to_not eq TestJSON.new(str: "test", ipaddr: IPAddr.new("127.0.0.2"))
   end
 
   it 'encodes to json with default values' do

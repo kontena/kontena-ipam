@@ -362,13 +362,15 @@ module EtcdModel
   #
   # @param other [EtcdModel]
   # @return [Boolean]
-  def ==(other)
-    return false if self.etcd_key != other.etcd_key
-
-    return false if !eq_json(other)
-
-    return true
+  def <=>(other)
+    if self.etcd_key != other.etcd_key
+      return self.etcd_key <=> other.etcd_key
+    else
+      return self.cmp_json(other)
+    end
   end
+
+  include Comparable
 
   # Compute etcd path, using key value
   #

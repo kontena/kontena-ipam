@@ -110,4 +110,15 @@ class EtcdClient < Etcd::Client
     debug { log_response(:create_in_order, key, opts, response) }
     return response
   end
+
+  # Logging wrapper
+  def watch(key, **opts)
+    response = super
+  rescue Etcd::Error => error
+    debug { log_error(:watch, key, opts, error) }
+    raise
+  else
+    debug { log_response(:watch, key, opts, response) }
+    return response
+  end
 end
