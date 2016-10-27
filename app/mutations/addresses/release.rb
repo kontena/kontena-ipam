@@ -23,8 +23,8 @@ module Addresses
 
     def execute
       info "releasing address: #{self.address} in pool: #{@pool_id}"
-      address = @pool.get_address(@address)
-      if address && address.to_host != @pool.gateway.to_host
+      address = @pool.get_address(self.address)
+      if address && address.address.to_host != @pool.gateway.to_host
         address.delete!
       end
     end
