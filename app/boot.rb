@@ -25,6 +25,7 @@ require_relative 'models/address_pool'
 require_relative 'models/address'
 require_relative 'mutations/address_pools/request'
 require_relative 'mutations/address_pools/release'
+require_relative 'mutations/address_pools/cleanup'
 require_relative 'mutations/addresses/request'
 require_relative 'mutations/addresses/release'
 

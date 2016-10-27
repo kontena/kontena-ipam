@@ -1,22 +1,18 @@
 #!/usr/bin/env ruby
 
-require 'ipaddr'
-require 'docker'
-
-require_relative 'app/boot'
-require_relative 'app/policy'
-require_relative 'app/logging'
+require_relative '../app/boot'
 
 if ENV['LOG_LEVEL']
   log_level = ENV['LOG_LEVEL'].to_i
 else
   log_level = Logger::INFO
 end
-Logging.initialize_logger(STDOUT, log_level)
-
+Logging.initialize_logger(STDERR, log_level)
 
 EtcdModel.etcd = EtcdClient.new(ENV)
 
+# TODO: Addresses::Cleanup
 cleaner = AddressCleanup.new
-
 cleaner.cleanup
+
+AddressPools::Cleanup.run!
