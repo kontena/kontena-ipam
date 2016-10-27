@@ -344,6 +344,19 @@ module EtcdModel
 
       etcd.delete(prefix, recursive: prefix.end_with?('/'))
     end
+
+    # Delete an empty directory under the given (partial) key prefix.
+    #
+    # The directory must not have any nodes
+    def rmdir(*key)
+      prefix = @etcd_schema.prefix(*key)
+
+      raise ArgumentError, "rmdir for complete object key" unless prefix.end_with? '/'
+
+      etcd.delete(prefix, dir: true)
+    rescue Etcd::DirNotEmpty => error
+      raise const_get(:Conflict), "Removing non-empty directory #{error.cause}@#{error.index}: #{error.message}"
+    end
   end
 
   def self.included(base)

@@ -369,6 +369,39 @@ describe EtcdModel do
         expect(etcd_server).to be_modified
       end
     end
+
+    describe '#rmdir' do
+      it 'deletes an empty directory from etcd', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/' => nil,
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', dir: true).and_call_original
+
+        TestEtcd.rmdir()
+
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/test/'],
+        ]
+        expect(etcd_server.list).to eq Set.new([
+          '/kontena/ipam/',
+        ])
+        expect(etcd_server).to be_modified
+      end
+
+      it 'does not delete a non-empty directory from etcd', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1' => { 'field' => "value 1" },
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', dir: true).and_call_original
+
+        expect{TestEtcd.rmdir()}.to raise_error(TestEtcd::Conflict)
+
+        expect(etcd_server).to_not be_modified
+      end
+
+    end
   end
 
   context 'for a complex model' do
