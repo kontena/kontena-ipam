@@ -94,6 +94,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           "/kontena/ipam/addresses/test/10.80.0.1" => {"address"=>"10.80.0.1/24", "node"=>"somehost"},
+          '/kontena/ipam/pool-nodes/test/somehost' => {},
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
@@ -108,6 +109,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           "/kontena/ipam/addresses/test/10.80.0.1" => {"address"=>"10.80.0.1/24", "node"=>"somehost"},
+          '/kontena/ipam/pool-nodes/test/somehost' => {},
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
@@ -122,6 +124,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           "/kontena/ipam/addresses/kontena/10.81.0.1" => {"address"=>"10.81.0.1/16", "node"=>"somehost"},
+          '/kontena/ipam/pool-nodes/kontena/somehost' => {},
           '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'gateway' =>  '10.81.0.1/16'},
           '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
         })
@@ -136,6 +139,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           "/kontena/ipam/addresses/kontena/10.81.0.1" => {"address"=>"10.81.0.1/16", "node"=>"somehost"},
+          '/kontena/ipam/pool-nodes/kontena/somehost' => {},
           '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'iprange' => '10.81.127.0/17', 'gateway' => '10.81.0.1/16' },
           '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
         })
@@ -145,6 +149,7 @@ describe IpamPlugin do
     context 'with etcd having an existing test network', :etcd => true do
       before do
         etcd_server.load!(
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         )
@@ -156,7 +161,13 @@ describe IpamPlugin do
         expect(last_response).to be_ok, last_response.errors
         expect(data).to eq('PoolID' => 'test1', 'Pool' => '10.80.0.0/24', 'Data' => {'com.docker.network.gateway' => '10.80.0.1/24'})
 
-        expect(etcd_server).to_not be_modified
+        expect(etcd_server).to be_modified
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
+          '/kontena/ipam/pool-nodes/test1/somehost' => {},
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
+          '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
+        })
       end
 
       it 'allocates dynamic addresses to avoid reservations' do
@@ -167,6 +178,8 @@ describe IpamPlugin do
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
+          '/kontena/ipam/pool-nodes/test2/somehost' => {},
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
           "/kontena/ipam/addresses/test2/10.80.1.1" => {"address"=>"10.80.1.1/24", "node"=>"somehost"},
@@ -192,6 +205,7 @@ describe IpamPlugin do
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
@@ -410,6 +424,9 @@ describe IpamPlugin do
           '/kontena/ipam/subnets/10.80.2.0' => { 'address' => '10.80.2.0/24' },
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
+          '/kontena/ipam/pool-nodes/test1/somehost' => {},
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
+          '/kontena/ipam/pool-nodes/test2/someotherhost' => {},
           '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
           '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
           '/kontena/ipam/addresses/test2/10.80.2.1' => { 'address' => '10.80.2.1/24' },
@@ -433,8 +450,14 @@ describe IpamPlugin do
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
           '/kontena/ipam/subnets/10.80.2.0' => { 'address' => '10.80.2.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
+          '/kontena/ipam/pool-nodes/test2/someotherhost' => {},
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
           '/kontena/ipam/addresses/test2/10.80.2.1' => { 'address' => '10.80.2.1/24' },
         })
       end

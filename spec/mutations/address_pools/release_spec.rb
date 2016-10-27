@@ -1,4 +1,8 @@
 describe AddressPools::Release do
+  before do
+    allow_any_instance_of(NodeHelper).to receive(:node).and_return('somehost')
+  end
+
   describe '#validate' do
     it 'rejects a missing network' do
       subject = described_class.new()
@@ -36,14 +40,14 @@ describe AddressPools::Release do
         expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
       end
 
-      it 'deletes the etcd node' do
-          subject = described_class.new(pool_id: 'kontena')
+      it 'releases the PoolNode' do
+        subject = described_class.new(pool_id: 'kontena')
 
-          expect(pool).to receive(:delete!)
+        expect(PoolNode).to receive(:delete).with('kontena', "somehost")
 
-          outcome = subject.run
+        outcome = subject.run
 
-          expect(outcome).to be_success
+        expect(outcome).to be_success
       end
     end
   end

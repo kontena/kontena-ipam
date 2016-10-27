@@ -22,8 +22,6 @@ class AddressPool
     Subnet.all
   end
 
-
-
   def self.create(id, subnet: nil, **opts)
     # use the first host address as gateway
     gateway = subnet ? subnet.hosts.first : nil
@@ -39,14 +37,27 @@ class AddressPool
     Subnet.reserve(@subnet)
     super
     Address.mkdir(@id)
+    PoolNode.mkdir(@id)
     create_address(gateway)
+  end
+
+  # Creates a PoolNode lease for the current node
+  def request!
+    PoolNode.create_or_get(@id, node)
+  end
+
+  # Release the PoolNode lease for the current node
+  def release!
+    PoolNode.delete(@id, node)
   end
 
   # Delete Address directory and release Subnet for this pool
   #
+  # @raise [PoolNode::Conflict] if the pool is still in use on some node
   # @see Address
   # @see Subnet
   def delete!
+    PoolNode.rmdir(@id)
     super
     Address.delete(@id)
     Subnet.delete(@subnet)

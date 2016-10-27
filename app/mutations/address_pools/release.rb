@@ -15,7 +15,7 @@ module AddressPools
     end
 
     def execute
-      @pool.delete!
+      @pool.release!
     end
   end
 end

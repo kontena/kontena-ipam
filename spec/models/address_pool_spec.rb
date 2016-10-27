@@ -15,6 +15,7 @@ describe AddressPool do
     ]))
     expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}')
     expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
+    expect(etcd).to receive(:set).with('/kontena/ipam/pool-nodes/kontena/', dir: true, prevExist: false)
     expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')
 
     expect(described_class.create('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"), gateway: IPAddr.new('10.81.0.1/16'))
@@ -48,6 +49,7 @@ describe AddressPool do
       ]))
       expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
+      expect(etcd).to receive(:set).with('/kontena/ipam/pool-nodes/kontena/', dir: true, prevExist: false)
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')
 
       expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"), gateway: IPAddr.new('10.81.0.1/16'))
@@ -144,6 +146,7 @@ describe AddressPool do
     end
 
     it 'deletes objects in etcd' do
+      expect(etcd).to receive(:delete).with('/kontena/ipam/pool-nodes/kontena/', dir: true)
       expect(etcd).to receive(:delete).with('/kontena/ipam/pools/kontena')
       expect(etcd).to receive(:delete).with('/kontena/ipam/addresses/kontena/', recursive: true)
       expect(etcd).to receive(:delete).with('/kontena/ipam/subnets/10.81.0.0', recursive: false)
