@@ -96,4 +96,35 @@ describe JSONModel do
     expect(TestJSON.from_json('{"foo": "bar"}')).to eq TestJSON.new()
     expect(TestJSON.from_json('{"str": "test", "foo": "bar"}')).to eq TestJSON.new(str: "test")
   end
+
+  context "for an empty model" do
+    class TestJSONEmpty
+      include JSONModel
+
+      def initialize(**attrs)
+        initialize_json(**attrs)
+      end
+
+      def <=>(other)
+        self.cmp_json(other)
+      end
+      include Comparable
+    end
+
+    it 'initializes no attributes' do
+      subject = TestJSONEmpty.new()
+    end
+
+    it 'compares equal' do
+      expect(TestJSONEmpty.new()).to eq TestJSONEmpty.new()
+    end
+
+    it 'encodes to json' do
+      expect(TestJSONEmpty.new().to_json).to eq('{}')
+    end
+
+    it 'decodes from json' do
+      expect(TestJSONEmpty.from_json('{}')).to eq TestJSONEmpty.new()
+    end
+  end
 end
