@@ -2,6 +2,11 @@ class AddressPool
   include JSONModel
   include EtcdModel
 
+  # Address pool is full
+  class Full < StandardError
+
+  end
+
   etcd_path '/kontena/ipam/pools/:id'
   json_attr :subnet, type: IPAddr
   json_attr :iprange, type: IPAddr, omitnil: true
