@@ -427,11 +427,11 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test1' }
 
         expect(last_response.status).to eq(400), last_response.errors
-        expect(data).to eq('Error' => "AddressPool test1 has still 2 reserved addresses")
+        expect(data).to eq('Error' => "AddressPool test1 has still reserved addresses")
       end
 
       it 'releases the pool when only gw reserved' do
-        etcd_server.delete('/kontena/ipam/addresses/test1/10.80.1.100')
+        etcd.delete('/kontena/ipam/addresses/test1/10.80.1.100')
         data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test1' }
 
         expect(last_response).to be_ok, last_response.errors

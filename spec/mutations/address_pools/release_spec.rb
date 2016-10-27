@@ -9,7 +9,7 @@ describe AddressPools::Release do
     it 'accepts an existing network' do
       pool = instance_double(AddressPool, id: 'kontena', subnet: IPAddr.new('10.80.0.0/16'), gateway: IPAddr.new('10.80.0.1/16'))
       expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
-      expect(pool).to receive(:list_addresses).and_return([double(pool: pool, id: '10.80.0.1', address: IPAddr.new('10.80.0.1/16'))])
+      expect(pool).to receive(:empty?).and_return(true)
       subject = described_class.new(pool_id: 'kontena')
 
       expect(subject).not_to have_errors, subject.validation_outcome.errors.inspect
@@ -29,14 +29,7 @@ describe AddressPools::Release do
     it 'rejects a network with reserved addresses' do
       pool = instance_double(AddressPool, id: 'kontena', subnet: IPAddr.new('10.80.0.0/16'), gateway: IPAddr.new('10.80.0.1/16'))
       expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
-      expect(pool).to receive(:list_addresses)
-        .and_return(
-          [
-            double(pool: pool, id: '10.80.0.1', address: IPAddr.new('10.80.0.1/16')),
-            double(pool: pool, id: '10.80.0.2', address: IPAddr.new('10.80.0.2/16'))
-          ]
-        )
-
+      expect(pool).to receive(:empty?).and_return(false)
       subject = described_class.new(pool_id: 'kontena')
 
       outcome = subject.validation_outcome
@@ -54,7 +47,7 @@ describe AddressPools::Release do
 
       before do
         expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
-        expect(pool).to receive(:list_addresses).and_return([double(pool: pool, id: '10.80.0.1', address: IPAddr.new('10.80.0.1/16'))])
+        expect(pool).to receive(:empty?).and_return(true)
       end
 
       it 'deletes the etcd node' do

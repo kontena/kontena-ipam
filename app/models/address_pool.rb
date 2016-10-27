@@ -76,6 +76,11 @@ class AddressPool
     Address.list(@id)
   end
 
+  # Check if the pool is empty. A pool is considered to be empty when the only allocated address is
+  def empty?
+    list_addresses.size <= 1
+  end
+
   # Return the set of reserved IP addresses from etcd.
   # These are host addresses without a netmask.
   #
