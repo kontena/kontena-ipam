@@ -4,12 +4,14 @@ require 'socket'
 
 require_relative 'boot'
 require_relative 'logging'
+require_relative 'node_helper'
 
 class AddressCleanup
   include Logging
+  include NodeHelper
 
   def initialize(node_id = nil)
-    @node = node_id || ENV['NODE_ID'] || Socket.gethostname
+    @node = node_id || node
   end
 
   def cleanup
@@ -21,8 +23,7 @@ class AddressCleanup
       pool.list_addresses.each { |address|
         debug "checking address: #{address.address.to_host}..."
         if address.node == @node
-          # TODO Uncomment the gateway part when gateway stuff merged into master
-          if known_addresses.include?(address.address.to_host) #|| pool.gateway.to_host == address.address.to_host
+          if known_addresses.include?(address.address.to_host) || pool.gateway.to_host == address.address.to_host
             debug '..still in use or gateway, skipping.'
             next
           else
