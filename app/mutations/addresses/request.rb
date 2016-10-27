@@ -17,28 +17,24 @@ module Addresses
     end
 
     optional do
-      string :address, discard_empty: true
+      ipaddr :address, discard_empty: true
     end
 
     def validate
-      @address = IPAddr.new(self.address) if self.address_present?
-
       unless @pool = AddressPool.get(pool_id)
         add_error(:pool, :not_found, "Pool not found: #{pool_id}")
       end
 
-      if @address && @pool
-        unless @pool.subnet.include?(@address)
-          add_error(:address, :out_of_pool, "Address #{@address} outside of pool subnet #{@pool.subnet}")
+      if self.address && @pool
+        unless @pool.subnet.include?(self.address)
+          add_error(:address, :out_of_pool, "Address #{self.address} outside of pool subnet #{@pool.subnet}")
         end
       end
-    rescue IPAddr::InvalidAddressError => error
-      add_error(:address, :invalid, error.message)
     end
 
     def execute
-      if @address
-        info "request static address #{@address} in pool #{@pool.id} with subnet #{@pool.subnet}"
+      if self.address
+        info "request static address #{self.address} in pool #{@pool.id} with subnet #{@pool.subnet}"
 
         request_static
       else
@@ -50,16 +46,16 @@ module Addresses
       add_error(:address, error.sym, error.message)
     end
 
-    # Allocate static @address within @pool.
+    # Allocate static self.address within @pool.
     #
     # @raise AddressError if reservation failed (conflict)
     # @return [Address] reserved address
     def request_static
       # reserve
-      return @pool.create_address(@address)
+      return @pool.create_address(self.address)
 
     rescue Address::Conflict => error
-      raise AddressError.new(:conflict), "Allocation conflict for address #{@address}: #{error.message}"
+      raise AddressError.new(:conflict), "Allocation conflict for address #{self.address}: #{error.message}"
     end
 
     # Allocate dynamic address within @pool.

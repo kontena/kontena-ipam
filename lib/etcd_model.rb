@@ -22,6 +22,11 @@ module EtcdModel
 
   end
 
+  # Get operation failed from value
+  class Invalid < StandardError
+
+  end
+
   # A structured etcd key path, consisting of String and Symbol components.
   #
   # @attr_reader path [Array<String, Symbol>] normalized path components, which are path-component strings, or symbols for instance variables
@@ -88,6 +93,7 @@ module EtcdModel
         value = values.shift
 
         raise ArgumentError, "Missing key argument for #{sym.inspect}" unless value
+        raise ArgumentError, "Empty key value for #{sym}" if value.empty?
 
         yield sym, value
       end
@@ -288,7 +294,7 @@ module EtcdModel
           _enumerate(y, node_key)
         else
           object = new(*node_key)
-          object.from_json!(node.value)
+          object.load!(node)
 
           y << object
         end
@@ -345,6 +351,7 @@ module EtcdModel
 
     # define per-model Errors
     base.const_set :Conflict, Class.new(EtcdModel::Conflict)
+    base.const_set :Invalid, Class.new(EtcdModel::Invalid)
   end
 
   # Initialize from etcd key values and JSON attrs
@@ -381,13 +388,28 @@ module EtcdModel
     end
   end
 
+  # Load object from etcd node
+  #
+  # Updates all JSON attribute values.
+  #
+  # @raise [Invalid]
+  def load!(node)
+    if node.directory?
+       raise self.class.const_get(:Invalid), "Node is a directory"
+     end
+
+    from_json!(node.value)
+  rescue JSON::ParserError => error
+    raise self.class.const_get(:Invalid), "Invalid JSON value: #{error}"
+  end
+
   # Get this objcet from etcd.
   #
   # Updates all JSON attribute values.
   #
   # @raise Etcd::KeyNotFound
   def get!
-    from_json!(etcd.get(etcd_key).value)
+    load!(etcd.get(etcd_key))
   end
 
   # Create this object in etcd, raising if the object already exists.
