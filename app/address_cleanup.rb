@@ -12,17 +12,6 @@ class AddressCleanup
     @node = node_id || ENV['NODE_ID'] || Socket.gethostname
   end
 
-  def self.run_async
-    cleanup = AddressCleanup.new
-    t = Thread.new {
-      loop do
-        cleanup.cleanup
-        sleep(60)
-      end
-    }
-  end
-
-
   def cleanup
     info "starting cleanup routine"
     known_addresses = local_addresses

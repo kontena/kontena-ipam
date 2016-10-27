@@ -12,7 +12,6 @@ EtcdModel.etcd = EtcdClient.new(ENV)
 
 IpamPlugin.policy = Policy.new(ENV)
 
-AddressCleanup.run_async
 
 
 run IpamPlugin
