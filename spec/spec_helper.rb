@@ -67,6 +67,12 @@ RSpec.configure do |config|
   end
 
   config.include EtcdHelpers
+
+  # kill etcd queries for non-etcd examples
+  config.before(:each) do
+    EtcdModel.etcd = double()
+  end
+
   config.before(:each, :etcd => true) do
     if etcd_endpoint = ENV['ETCD_ENDPOINT']
       uri = URI(etcd_endpoint)
