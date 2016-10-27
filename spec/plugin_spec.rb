@@ -87,11 +87,12 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'} }
 
         expect(last_response).to be_ok, last_response.errors
-        expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
+        expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {'com.docker.network.gateway' => '10.80.0.1/24'})
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          "/kontena/ipam/addresses/test/10.80.0.1" => {"address"=>"10.80.0.1/24"},
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
       end
@@ -100,11 +101,12 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test'}, 'Pool' => '', 'SubPool' => ''}
 
         expect(last_response).to be_ok, last_response.errors
-        expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {})
+        expect(data).to eq('PoolID' => 'test', 'Pool' => '10.80.0.0/24', 'Data' => {'com.docker.network.gateway' => '10.80.0.1/24'})
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          "/kontena/ipam/addresses/test/10.80.0.1" => {"address"=>"10.80.0.1/24"},
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
       end
@@ -113,11 +115,12 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16'}
 
         expect(last_response).to be_ok, last_response.errors
-        expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {})
+        expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {'com.docker.network.gateway' => '10.81.0.1/16'})
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16' },
+          "/kontena/ipam/addresses/kontena/10.81.0.1" => {"address"=>"10.81.0.1/16"},
+          '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'gateway' =>  '10.81.0.1/16'},
           '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
         })
       end
@@ -126,11 +129,12 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'kontena'}, 'Pool' => '10.81.0.0/16', 'SubPool' => '10.81.127.0/17'}
 
         expect(last_response).to be_ok, last_response.errors
-        expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {})
+        expect(data).to eq('PoolID' => 'kontena', 'Pool' => '10.81.0.0/16', 'Data' => {'com.docker.network.gateway' => '10.81.0.1/16'})
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'iprange' => '10.81.127.0/17' },
+          "/kontena/ipam/addresses/kontena/10.81.0.1" => {"address"=>"10.81.0.1/16"},
+          '/kontena/ipam/pools/kontena' => { 'subnet' => '10.81.0.0/16', 'iprange' => '10.81.127.0/17', 'gateway' => '10.81.0.1/16' },
           '/kontena/ipam/subnets/10.81.0.0' => { 'address' => '10.81.0.0/16' },
         })
       end
@@ -139,7 +143,7 @@ describe IpamPlugin do
     context 'with etcd having an existing test network', :etcd => true do
       before do
         etcd_server.load!(
-          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         )
       end
@@ -148,7 +152,7 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test1'} }
 
         expect(last_response).to be_ok, last_response.errors
-        expect(data).to eq('PoolID' => 'test1', 'Pool' => '10.80.0.0/24', 'Data' => {})
+        expect(data).to eq('PoolID' => 'test1', 'Pool' => '10.80.0.0/24', 'Data' => {'com.docker.network.gateway' => '10.80.0.1/24'})
 
         expect(etcd_server).to_not be_modified
       end
@@ -157,12 +161,13 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestPool', { 'Options' => { 'network' => 'test2'} }
 
         expect(last_response).to be_ok, last_response.errors
-        expect(data).to eq('PoolID' => 'test2', 'Pool' => '10.80.1.0/24', 'Data' => {})
+        expect(data).to eq('PoolID' => 'test2', 'Pool' => '10.80.1.0/24', 'Data' => {'com.docker.network.gateway' => '10.80.1.1/24'})
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
+          '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          "/kontena/ipam/addresses/test2/10.80.1.1" => {"address"=>"10.80.1.1/24"},
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
           '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
         })
@@ -185,7 +190,7 @@ describe IpamPlugin do
 
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
-          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
         })
         expect(etcd_server.logs).to eq [
@@ -212,11 +217,12 @@ describe IpamPlugin do
       before do
         etcd_server.load!(
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
+          '/kontena/ipam/addresses/test/' => nil
         )
       end
 
-      it 'allocates a dynamic adress' do
+      it 'allocates a dynamic address' do
         data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test' }
 
         expect(last_response).to be_ok, last_response.errors
@@ -228,7 +234,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           "/kontena/ipam/addresses/test/#{addr.to_s}" => { 'address' => addr.to_cidr },
         })
       end
@@ -242,7 +248,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
         })
       end
@@ -252,7 +258,7 @@ describe IpamPlugin do
       before do
         etcd_server.load!(
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
         )
@@ -279,7 +285,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
           "/kontena/ipam/addresses/test/#{addr.to_s}" => { 'address' => addr.to_cidr },
@@ -295,7 +301,7 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.2' => { 'address' => '10.80.0.2/24' },
           '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
@@ -309,7 +315,7 @@ describe IpamPlugin do
       before do
         etcd_server.load!(
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.100' => { 'address' => '10.80.0.100/24' },
         )
@@ -378,9 +384,18 @@ describe IpamPlugin do
         expect(etcd_server).to be_modified
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.0.0' => { 'address' => '10.80.0.0/24' },
-          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24' },
+          '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
         })
+      end
+
+      it 'release of gateway has no effect' do
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({})
+
+        expect(etcd_server).to_not be_modified
       end
     end
   end

@@ -90,7 +90,7 @@ class IpamPlugin < Sinatra::Application
     json(
       'PoolID' => pool.id,
       'Pool' => pool.subnet.to_cidr,
-      'Data' => {},
+      'Data' => {'com.docker.network.gateway' => pool.gateway.to_cidr},
     )
   end
 

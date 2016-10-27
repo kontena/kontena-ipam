@@ -5,14 +5,23 @@ class AddressPool
   etcd_path '/kontena/ipam/pools/:id'
   json_attr :subnet, type: IPAddr
   json_attr :iprange, type: IPAddr, omitnil: true
+  json_attr :gateway, type: IPAddr
 
-  attr_accessor :id, :subnet, :iprange
+  attr_accessor :id, :subnet, :iprange, :gateway
 
   # Return currently reserved subnets
   #
   # @return [IPSet]
   def self.reserved_subnets
     Subnet.all
+  end
+
+
+
+  def self.create(id, subnet: nil, **opts)
+    # use the first host address as gateway
+    gateway = subnet ? subnet.hosts.first : nil
+    super(id, subnet: subnet, gateway: gateway, **opts)
   end
 
   # Reserve Subnet and create Address directory for this pool
@@ -24,6 +33,7 @@ class AddressPool
     Subnet.reserve(@subnet)
     super
     Address.mkdir(@id)
+    create_address(gateway)
   end
 
   # Delete Address directory and release Subnet for this pool
