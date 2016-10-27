@@ -220,7 +220,7 @@ describe Addresses::Request do
         expect(policy).to receive(:allocate_address).with(addresses).and_return(IPAddr.new('10.81.1.1/16'))
         expect(Address).to receive(:create).with('kontena', '10.81.1.1', address: IPAddr.new('10.81.1.1/16')).and_raise(Address::Conflict)
 
-        expect(RetryHelper).to receive(:retry_sleep)
+        expect(subject).to receive(:retry_sleep)
 
         expect(pool).to receive(:reserved_addresses).and_return(IPSet.new([IPAddr.new('10.81.1.1')]))
         expect(policy).to receive(:allocate_address).with(addresses - [IPAddr.new('10.81.1.1/16')]).and_return(IPAddr.new('10.81.1.2/16'))

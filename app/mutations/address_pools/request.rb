@@ -1,6 +1,7 @@
 module AddressPools
   class Request < Mutations::Command
     include Logging
+    include RetryHelper
 
     required do
       model :policy
@@ -34,7 +35,7 @@ module AddressPools
       else
         info "request dynamic network #{network} pool"
 
-        pool = RetryHelper.with_retry(Subnet::Conflict) {
+        pool = with_retry(Subnet::Conflict) {
            request_dynamic
         }
       end

@@ -3,6 +3,7 @@ require 'ipaddr'
 module Addresses
   class Request < Mutations::Command
     include Logging
+    include RetryHelper
 
     required do
       model :policy
@@ -34,7 +35,7 @@ module Addresses
         info "request dynamic address in pool #{@pool.id} with subnet #{@pool.subnet}"
 
         # should make progress given that we refresh the set of reserved addresses, and raise a different error if the pool is full
-        RetryHelper.with_retry(Address::Conflict) do
+        with_retry(Address::Conflict) do
           request_dynamic
         end
       end

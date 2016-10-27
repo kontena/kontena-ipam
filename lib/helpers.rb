@@ -4,14 +4,14 @@ module RetryHelper
   RETRY_CAP = 10.0 # seconds
 
   # Jittery sleep
-  def self.retry_sleep(t)
+  def retry_sleep(t)
     sleep Random.rand() * t
   end
 
   # Randomized exponential backoff with jitter
   #
   # @see https://www.awsarchitectureblog.com/2015/03/backoff.html
-  def self.with_retry(*exceptions, attempts: RETRY_ATTEMPTS, base: RETRY_BASE, cap: RETRY_CAP, &block)
+  def with_retry(*exceptions, attempts: RETRY_ATTEMPTS, base: RETRY_BASE, cap: RETRY_CAP, &block)
     attempt = 0
 
     begin
