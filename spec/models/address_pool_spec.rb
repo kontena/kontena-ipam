@@ -91,6 +91,38 @@ describe AddressPool do
       described_class.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: '10.81.128.0/17', gateway: IPAddr.new('10.81.0.1/16'))
     end
 
+    describe '#request!' do
+      it 'requests a PoolNode' do
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
+
+        subject.request!
+      end
+    end
+
+    describe '#orphaned?' do
+      it 'is orphaned if there are no PoolNodes' do
+        expect(PoolNode).to receive(:list).with('kontena').and_return([])
+
+        expect(subject).to be_orphaned
+      end
+
+      it 'is not orphaned if there are PoolNodes' do
+        expect(PoolNode).to receive(:list).with('kontena').and_return([
+          PoolNode.new('kontena', "testhost")
+        ])
+
+        expect(subject).to_not be_orphaned
+      end
+    end
+
+    describe '#release!' do
+      it 'releases the PoolNode' do
+        expect(PoolNode).to receive(:delete).with('kontena', 'somehost')
+
+        subject.release!
+      end
+    end
+
     it 'creates an address' do
       expect(subject).to receive(:node).and_return('somehost')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')

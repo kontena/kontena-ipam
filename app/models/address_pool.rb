@@ -46,6 +46,11 @@ class AddressPool
     PoolNode.create_or_get(@id, node)
   end
 
+  # @return [Boolean] pool is not in use on any nodes
+  def orphaned?
+    PoolNode.list(@id).empty?
+  end
+
   # Release the PoolNode lease for the current node
   def release!
     PoolNode.delete(@id, node)
