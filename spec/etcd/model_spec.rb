@@ -368,6 +368,22 @@ describe EtcdModel do
         )
         expect(etcd_server).to be_modified
       end
+
+      it 'raises for a non-existant directory', :etcd => true do
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', recursive: true).and_call_original
+
+        expect{TestEtcd.delete()}.to raise_error(TestEtcd::NotFound)
+      end
+
+      it 'raises for a non-existant node', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test2' => { 'field' => "value 2" },
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1', recursive: false).and_call_original
+
+        expect{TestEtcd.delete('test1')}.to raise_error(TestEtcd::NotFound)
+      end
     end
 
     describe '#rmdir' do
@@ -401,6 +417,11 @@ describe EtcdModel do
         expect(etcd_server).to_not be_modified
       end
 
+      it 'raises for a non-existant directory', :etcd => true do
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', dir: true).and_call_original
+
+        expect{TestEtcd.rmdir()}.to raise_error(TestEtcd::NotFound)
+      end
     end
   end
 
