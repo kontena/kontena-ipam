@@ -11,7 +11,7 @@ class AddressCleanup
   include NodeHelper
 
   def initialize(node_id = nil)
-    @node = node_id || node
+    @node = node_id || node
   end
 
   def cleanup
@@ -27,7 +27,7 @@ class AddressCleanup
             debug '..still in use or gateway, skipping.'
             next
           else
-            debug "found reserved address #{address.address.to_host} no longer known by local Docker. Removing the reservation."
+            warn "found reserved address #{address.address.to_host} no longer known by local Docker. Removing the reservation."
             address.delete!
           end
         else

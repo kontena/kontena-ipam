@@ -8,6 +8,14 @@ describe AddressCleanup do
     described_class.new('1')
   end
 
+  describe '#initialize' do
+    it 'fallbacks to NodeHelper to get node id' do
+      expect_any_instance_of(NodeHelper).to receive(:node).and_return('somenode')
+
+      cleaner = described_class.new
+      expect(cleaner.instance_variable_get('@node')).to eq('somenode')
+    end
+  end
 
   describe '#local_addresses' do
     it 'collects all docker address' do
