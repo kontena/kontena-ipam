@@ -1,6 +1,7 @@
 class AddressPool
   include JSONModel
   include EtcdModel
+  include NodeHelper
 
   # Address pool is full
   class Full < StandardError
@@ -63,7 +64,7 @@ class AddressPool
   # @param addr [IPAddr] within our subnet
   # @return [Address] or nil on conflict
   def create_address(addr, **opts)
-    Address.create(@id, addr.to_s, address: subnet.subnet_addr(addr), **opts)
+    Address.create(@id, addr.to_s, node: node, address: subnet.subnet_addr(addr), **opts)
   end
 
   # Return specific address from pool

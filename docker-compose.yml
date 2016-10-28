@@ -3,6 +3,7 @@ plugin:
   net: host
   volumes:
     - /run/docker/plugins/:/run/docker/plugins/
+    - /var/run/docker.sock:/var/run/docker.sock
 etcd:
   image: kontena/etcd:2.3.3
   net: host
