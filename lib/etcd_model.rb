@@ -27,6 +27,10 @@ module EtcdModel
 
   end
 
+  class NotFound < StandardError
+
+  end
+
   # A structured etcd key path, consisting of String and Symbol components.
   #
   # @attr_reader path [Array<String, Symbol>] normalized path components, which are path-component strings, or symbols for instance variables
@@ -343,6 +347,23 @@ module EtcdModel
       prefix = @etcd_schema.prefix(*key)
 
       etcd.delete(prefix, recursive: prefix.end_with?('/'))
+    rescue Etcd::KeyNotFound => error
+      raise const_get(:NotFound), "Removing non-existant node #{error.cause}@#{error.index}: #{error.message}"
+    end
+
+    # Delete an empty directory under the given (partial) key prefix.
+    #
+    # The directory must not have any nodes
+    def rmdir(*key)
+      prefix = @etcd_schema.prefix(*key)
+
+      raise ArgumentError, "rmdir for complete object key" unless prefix.end_with? '/'
+
+      etcd.delete(prefix, dir: true)
+    rescue Etcd::KeyNotFound => error
+      raise const_get(:NotFound), "Removing non-existant directory #{error.cause}@#{error.index}: #{error.message}"
+    rescue Etcd::DirNotEmpty => error
+      raise const_get(:Conflict), "Removing non-empty directory #{error.cause}@#{error.index}: #{error.message}"
     end
   end
 
@@ -352,6 +373,7 @@ module EtcdModel
     # define per-model Errors
     base.const_set :Conflict, Class.new(EtcdModel::Conflict)
     base.const_set :Invalid, Class.new(EtcdModel::Invalid)
+    base.const_set :NotFound, Class.new(EtcdModel::NotFound)
   end
 
   # Initialize from etcd key values and JSON attrs

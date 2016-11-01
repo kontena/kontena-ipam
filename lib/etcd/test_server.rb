@@ -80,7 +80,7 @@ class Etcd::TestServer < Etcd::ServerBase
   def load!(tree)
     load_nodes(tree) do |key, value|
       if value == :directory
-        response = @client.set(key, directory: true)
+        response = @client.set(key, dir: true)
       else
         response = @client.set(key, value: value)
       end

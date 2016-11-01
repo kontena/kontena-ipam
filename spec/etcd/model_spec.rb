@@ -283,78 +283,145 @@ describe EtcdModel do
     end
 
     it 'lists empty if directory is missing in etcd', :etcd => true do
-      expect(etcd).to receive(:get).with('/kontena/ipam/test/').and_raise(Etcd::KeyNotFound)
+      expect(etcd).to receive(:get).with('/kontena/ipam/test/').and_call_original
 
       expect(TestEtcd.list()).to eq []
 
       expect(etcd_server).to_not be_modified
     end
 
-    it 'deletes instance from etcd', :etcd => true do
+    it 'lists empty if directory is empty in etcd', :etcd => true do
       etcd_server.load!(
         '/kontena/ipam/test/test1' => { 'field' => "value 1" },
-        '/kontena/ipam/test/test2' => { 'field' => "value 2" },
       )
+      etcd.delete('/kontena/ipam/test/test1')
 
-      expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1').and_call_original
+      expect(etcd).to receive(:get).with('/kontena/ipam/test/').and_call_original
 
-      TestEtcd.new('test1').delete!
-
-      expect(etcd_server.logs).to eq [
-        [:delete, '/kontena/ipam/test/test1'],
-      ]
-      expect(etcd_server.list).to eq Set.new([
-        '/kontena/ipam/',
-        '/kontena/ipam/test/',
-        '/kontena/ipam/test/test2',
-      ])
-      expect(etcd_server.nodes).to eq(
-        '/kontena/ipam/test/test2' => {'field' => "value 2"},
-      )
-      expect(etcd_server).to be_modified
+      expect(TestEtcd.list()).to be_empty
     end
 
-    it 'deletes everything from etcd recursively', :etcd => true do
-      etcd_server.load!(
-        '/kontena/ipam/test/test1' => { 'field' => "value 1" },
-        '/kontena/ipam/test/test2' => { 'field' => "value 2" },
-      )
+    describe '#delete' do
+      it 'deletes instance from etcd', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1' => { 'field' => "value 1" },
+          '/kontena/ipam/test/test2' => { 'field' => "value 2" },
+        )
 
-      expect(etcd).to receive(:delete).with('/kontena/ipam/test/', recursive: true).and_call_original
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1').and_call_original
 
-      TestEtcd.delete()
+        TestEtcd.new('test1').delete!
 
-      expect(etcd_server.logs).to eq [
-        [:delete, '/kontena/ipam/test/'],
-      ]
-      expect(etcd_server.list).to eq Set.new([
-        '/kontena/ipam/',
-      ])
-      expect(etcd_server).to be_modified
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/test/test1'],
+        ]
+        expect(etcd_server.list).to eq Set.new([
+          '/kontena/ipam/',
+          '/kontena/ipam/test/',
+          '/kontena/ipam/test/test2',
+        ])
+        expect(etcd_server.nodes).to eq(
+          '/kontena/ipam/test/test2' => {'field' => "value 2"},
+        )
+        expect(etcd_server).to be_modified
+      end
+
+      it 'deletes everything from etcd recursively', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1' => { 'field' => "value 1" },
+          '/kontena/ipam/test/test2' => { 'field' => "value 2" },
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', recursive: true).and_call_original
+
+        TestEtcd.delete()
+
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/test/'],
+        ]
+        expect(etcd_server.list).to eq Set.new([
+          '/kontena/ipam/',
+        ])
+        expect(etcd_server).to be_modified
+      end
+
+      it 'deletes instance from etcd', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1' => { 'field' => "value 1" },
+          '/kontena/ipam/test/test2' => { 'field' => "value 2" },
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1', recursive: false).and_call_original
+
+        TestEtcd.delete('test1')
+
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/test/test1'],
+        ]
+        expect(etcd_server.list).to eq Set.new([
+          '/kontena/ipam/',
+          '/kontena/ipam/test/',
+          '/kontena/ipam/test/test2',
+        ])
+        expect(etcd_server.nodes).to eq(
+          '/kontena/ipam/test/test2' => {'field' => "value 2"},
+        )
+        expect(etcd_server).to be_modified
+      end
+
+      it 'raises for a non-existant directory', :etcd => true do
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', recursive: true).and_call_original
+
+        expect{TestEtcd.delete()}.to raise_error(TestEtcd::NotFound)
+      end
+
+      it 'raises for a non-existant node', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test2' => { 'field' => "value 2" },
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1', recursive: false).and_call_original
+
+        expect{TestEtcd.delete('test1')}.to raise_error(TestEtcd::NotFound)
+      end
     end
 
-    it 'deletes instance from etcd', :etcd => true do
-      etcd_server.load!(
-        '/kontena/ipam/test/test1' => { 'field' => "value 1" },
-        '/kontena/ipam/test/test2' => { 'field' => "value 2" },
-      )
+    describe '#rmdir' do
+      it 'deletes an empty directory from etcd', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/' => nil,
+        )
 
-      expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1', recursive: false).and_call_original
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', dir: true).and_call_original
 
-      TestEtcd.delete('test1')
+        TestEtcd.rmdir()
 
-      expect(etcd_server.logs).to eq [
-        [:delete, '/kontena/ipam/test/test1'],
-      ]
-      expect(etcd_server.list).to eq Set.new([
-        '/kontena/ipam/',
-        '/kontena/ipam/test/',
-        '/kontena/ipam/test/test2',
-      ])
-      expect(etcd_server.nodes).to eq(
-        '/kontena/ipam/test/test2' => {'field' => "value 2"},
-      )
-      expect(etcd_server).to be_modified
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/test/'],
+        ]
+        expect(etcd_server.list).to eq Set.new([
+          '/kontena/ipam/',
+        ])
+        expect(etcd_server).to be_modified
+      end
+
+      it 'does not delete a non-empty directory from etcd', :etcd => true do
+        etcd_server.load!(
+          '/kontena/ipam/test/test1' => { 'field' => "value 1" },
+        )
+
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', dir: true).and_call_original
+
+        expect{TestEtcd.rmdir()}.to raise_error(TestEtcd::Conflict)
+
+        expect(etcd_server).to_not be_modified
+      end
+
+      it 'raises for a non-existant directory', :etcd => true do
+        expect(etcd).to receive(:delete).with('/kontena/ipam/test/', dir: true).and_call_original
+
+        expect{TestEtcd.rmdir()}.to raise_error(TestEtcd::NotFound)
+      end
     end
   end
 

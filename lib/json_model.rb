@@ -48,7 +48,7 @@ module JSONModel
     #
     # @return [Hash<Symbol, JSONAttr>]
     def json_attrs
-      @json_attrs
+      @json_attrs ||= {}
     end
 
     # Return decoded JSON object

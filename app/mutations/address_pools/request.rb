@@ -40,7 +40,9 @@ module AddressPools
         }
       end
 
-      return verify(pool)
+      pool = verify(pool)
+      pool.request!
+      pool
 
     rescue AddressPool::Full => error
       add_error(:subnet, :full, error.message)

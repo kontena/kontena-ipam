@@ -9,6 +9,8 @@ describe AddressPools::Request do
     allow(policy).to receive(:is_a?).with(Hash).and_return(false)
     allow(policy).to receive(:is_a?).with(Array).and_return(false)
     allow(policy).to receive(:is_a?).with(Policy).and_return(true)
+
+    allow_any_instance_of(NodeHelper).to receive(:node).and_return('somehost')
   end
 
   describe '#validate' do
@@ -81,8 +83,19 @@ describe AddressPools::Request do
         described_class.new(policy: policy, network: 'kontena')
       end
 
+      it 'returns address pool if it already reserved in etcd' do
+        expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
+
+        outcome = subject.run
+
+        expect(outcome).to be_success
+        expect(outcome.result).to eq AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16'))
+      end
+
       it 'returns address pool if it already exists in etcd' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
 
         outcome = subject.run
 
@@ -96,6 +109,7 @@ describe AddressPools::Request do
         expect(Subnet).to receive(:all).with(no_args).and_return(ipset)
         expect(policy).to receive(:allocatable_subnets).with(ipset).and_return([IPAddr.new('10.80.0.0/24')])
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.80.0.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/24')))
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
 
         outcome = subject.run
 
@@ -111,6 +125,7 @@ describe AddressPools::Request do
         expect(Subnet).to receive(:all).with(no_args).and_return(ipset)
         expect(policy).to receive(:allocatable_subnets).with(ipset).and_return([IPAddr.new('10.80.1.0/24')])
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.80.1.0/24')).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.80.1.0/24')))
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
 
         outcome = subject.run
 
@@ -138,6 +153,7 @@ describe AddressPools::Request do
 
       it 'returns address pool if it already exists in etcd' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
 
         outcome = subject.run
 
@@ -201,6 +217,7 @@ describe AddressPools::Request do
       it 'returns address pool if some other network exists in etcd' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: nil).and_return(AddressPool.new('kontena', subnet: IPAddr.new('10.81.0.0/16')))
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
 
         outcome = subject.run
 
@@ -221,6 +238,7 @@ describe AddressPools::Request do
       it 'creates the address pool with the ipragnge' do
         expect(AddressPool).to receive(:get).with('kontena').and_return(nil)
         expect(AddressPool).to receive(:create_or_get).with('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: IPAddr.new('10.81.128.0/17')).and_return(pool)
+        expect(PoolNode).to receive(:create_or_get).with('kontena', 'somehost').and_return(PoolNode.new('kontena', 'somehost'))
 
         outcome = subject.run
 
