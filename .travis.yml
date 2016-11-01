@@ -17,7 +17,7 @@ services:
 env:
 
 before_install:
-  - docker pull kontena/etcd:2.7.3
+  - docker pull kontena/etcd:2.3.7
   - docker run -d --net host --name etcd kontena/etcd:2.3.7
 
 script:
