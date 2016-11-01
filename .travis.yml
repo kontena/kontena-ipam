@@ -1,0 +1,33 @@
+sudo: required
+
+language: ruby
+
+rvm:
+  - 2.3.1
+
+cache: bundler
+
+cache:
+  directories:
+  - vendor/bundle
+
+services:
+  - docker
+
+env:
+
+before_install:
+  - docker pull kontena/etcd:2.7.3
+  - docker run -d --net host --name etcd kontena/etcd:2.3.7
+
+script:
+  - bundle install --path vendor/bundle
+  - bundle exec rspec spec/
+
+deploy:
+  - provider: script
+    script: "$TRAVIS_BUILD_DIR/build/travis/deploy.sh"
+    on:
+      tags: true
+      rvm: 2.3.1
+      repo: kontena/kontena-docker-ipam-plugin
