@@ -57,6 +57,14 @@ class AddressPool
   end
 
   # delete! if orphaned?
+  #
+  # There is a small race window here between two nodes concurrently requesting
+  # and releasing the same AddressPool:
+  #
+  # * B AddressPool.get
+  # * A PoolNode.rmdir
+  # * B AddressPool.request!
+  # * A AddressPool.delete!
   def cleanup
     delete!
   rescue PoolNode::Conflict
