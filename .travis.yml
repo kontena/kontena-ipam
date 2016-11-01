@@ -1,0 +1,36 @@
+sudo: required
+
+language: ruby
+
+rvm:
+  - 2.3.1
+
+cache: bundler
+
+cache:
+  directories:
+  - vendor/bundle
+
+services:
+  - docker
+
+env:
+  global:
+    # DockerHub password
+    - secure: "nOMwd0f9zpkBm27W4fMzgLOhwB+3vVFILkN6H9Wbg86PqEYwwzMTY9z3NlpcLwRYw/UWOFOBTOYsMP3hnz6dIGqMl7iu12xxwFnrnw0MSbWyXwDFMqyGHLEyR4VALpwf/5lyPBjfa79/nu4uW/EaggubGcut2Varv6nO1ZSG6GJ981OXdaTWVHEN8/8y/AvVoJBhMKKNQRisJ+kIhMfW7yMH0/gn7PUQagAE2SpFP2vY9IfZVj97Nz9oRECm65aoWKwNgv8u6dVQ01sM3q+5ZAuNSWvto9rTYxlSICjyalltKASluflvO66xSIEsYIYtYSqrkfIGRSxuMaPgqCJ+GaB0VBU6Fy8rfRM5OwwYs97Dxfsd/v8JKTEWUw0PT+PWmlRZqlv0LBBMH819nrSuVlENmLIaa477Vk6nMHz3UCe8wmL0o9tO52fMEG4MajUPl8mDj24yTNaiUIdhs+xAeMxhCCvr3Kb8Kt+Sl9lt7FJ7wbdG2nl+P7/dIHDb1erfbOrXPJnHYCLGJawdM8ng2i7rjv5INl7tv8/urfpZ+kvXQ98vPzr0UWZ3glmM4Kugc5gvJNcYztpwB2pLhT3G1LHHfz7bYVAF55rxE23pbamfelQjn5QWBmEBK6MouQYetfNpjiVA9YD1uYYUrd8Iu9Zc6/X3AqqfuiJfqUqajhY="
+
+before_install:
+  - docker pull kontena/etcd:2.3.7
+  - docker run -d --net host --name etcd kontena/etcd:2.3.7
+
+script:
+  - bundle install --path vendor/bundle
+  - bundle exec rspec spec/
+
+deploy:
+  - provider: script
+    script: "$TRAVIS_BUILD_DIR/build/travis/deploy.sh"
+    on:
+      tags: true
+      rvm: 2.3.1
+      repo: kontena/kontena-docker-ipam-plugin
