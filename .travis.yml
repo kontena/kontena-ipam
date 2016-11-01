@@ -23,6 +23,7 @@ before_install:
 script:
   - bundle install --path vendor/bundle
   - bundle exec rspec spec/
+  - ETCD_ENDPOINT=http://localhost:2379 bundle exec rspec spec/
 
 deploy:
   - provider: script
