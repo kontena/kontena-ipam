@@ -426,7 +426,7 @@ describe IpamPlugin do
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
           '/kontena/ipam/pool-nodes/test1/somehost' => {},
           '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
-          '/kontena/ipam/pool-nodes/test2/someotherhost' => {},
+          '/kontena/ipam/pool-nodes/test2/somehost' => {},
           '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
           '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
           '/kontena/ipam/addresses/test2/10.80.2.1' => { 'address' => '10.80.2.1/24' },
@@ -442,7 +442,7 @@ describe IpamPlugin do
         expect(etcd_server).to_not be_modified
       end
 
-      it 'releases the pool' do
+      it 'releases the pool but leaves it in use on a different node' do
         data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test1' }
 
         expect(last_response).to be_ok, last_response.errors
@@ -455,10 +455,27 @@ describe IpamPlugin do
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
           '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
-          '/kontena/ipam/pool-nodes/test2/someotherhost' => {},
+          '/kontena/ipam/pool-nodes/test2/somehost' => {},
           '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
           '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
           '/kontena/ipam/addresses/test2/10.80.2.1' => { 'address' => '10.80.2.1/24' },
+        })
+      end
+
+      it 'releases the pool and deletes it if not used on another node' do
+        data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test2' }
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({})
+
+        expect(etcd_server).to be_modified
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24' },
+          '/kontena/ipam/pool-nodes/test1/somehost' => {},
+          '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
         })
       end
     end

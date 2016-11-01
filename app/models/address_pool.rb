@@ -56,6 +56,13 @@ class AddressPool
     PoolNode.delete(@id, node)
   end
 
+  # delete! if orphaned?
+  def cleanup
+    delete!
+  rescue PoolNode::Conflict
+    # still in use
+  end
+
   # Delete Address directory and release Subnet for this pool
   #
   # @raise [PoolNode::Conflict] if the pool is still in use on some node
