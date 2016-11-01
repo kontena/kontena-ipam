@@ -408,7 +408,7 @@ describe IpamPlugin do
         etcd_server.load!(
           '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
           '/kontena/ipam/subnets/10.80.2.0' => { 'address' => '10.80.2.0/24' },
-          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
           '/kontena/ipam/pools/test2' => { 'subnet' => '10.80.2.0/24' },
           '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
           '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
@@ -425,7 +425,15 @@ describe IpamPlugin do
         expect(etcd_server).to_not be_modified
       end
 
-      it 'releases the pool' do
+      it 'does not release pool when reserved addresses' do
+        data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test1' }
+
+        expect(last_response.status).to eq(400), last_response.errors
+        expect(data).to eq('Error' => "AddressPool test1 has still reserved addresses")
+      end
+
+      it 'releases the pool when only gw reserved' do
+        etcd.delete('/kontena/ipam/addresses/test1/10.80.1.100')
         data = api_post '/IpamDriver.ReleasePool', { 'PoolID' => 'test1' }
 
         expect(last_response).to be_ok, last_response.errors
