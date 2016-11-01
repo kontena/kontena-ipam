@@ -15,6 +15,9 @@ services:
   - docker
 
 env:
+  global:
+    - secure: "p+H6OzTOmLWT3MQonqB+dS2mr/oGBOXSVvcTwXjB4HstgSbn2l65u+tFTnSE7uHEFAmXiiAAiMcPkVxGZjNI7cDoJOks0MYzaMWUiMw5ajgPqTRnj4Fa6o8vuiGRfIfkISL5aeZZcF0gTTWziaiQ58GM3fVTW7VsiZq9QVbcze0Ay1NLNpG9ZZ1duKN0LlRfRQkAxrFVOE7n+U/ggSkLDalbpxW2+CBxJX3eitxSp34ks+NYWUqbDQu3Q5OL1ZSt3QzhM/88eolMOOTWQijaAQcoApbeMzei+IJC7A467AfLRDibRMGHIO1pNW8MFUfQJrZyjeLpe8SLHXXtaNzruJkYLL6a8hIh/AKSd3wOEGbgJjoWgLFK3bkVyl1VQFKvU+hT7kHImvIdZ3Q8iL6N/nnwJVpnhh6FXnwlE0G1tqkXEd6WuJR082lVudqW/lGaPFz9Z11dz+sQneBctVRYlziuMfLQg57gcojM3IWS9JLY6CkLI1YwCIjYelpcitQl1PufI5IdMtANybZtN7f5KD0W6pG3o1WGCG38sq5oO1HNMzam6cX/qZ6yY1q1Q7GBAJ7BE3cluNtpB2Ejohp4gB9hTwMGsYs+vw1he+D58oqZWzrE2A+yxNw8fAx0rukel2dcf6ckrHLDj0GYZexyuf7gmKnkrgnXjXvXumKvUgQ="
+    - secure: "QCpGtYdw1ZNHhfreaCd9ya/GQTa29e33pTR4HhxcUHhZwJkXzGJAz4zUXQBG0IawrSg1C/TpVswpPd6xaXDaz1DHZPDj1T18alfJmeCkMS76PfGvQ6i2O1RxWdKZ5yAgO3noxiRON25PWj6jOQFj/UpPsfJVuxzEzyh65I38v/0HDrWu1mEdu1fL70kqa9PZemo6P+JWgQ9oEtjEYKGAz/5d5TurfLfNNJuv8JGh/OLkrdEna7syXHQNw01JO7Z5fdBDndfuLhMlFHsOVsWCUtoUqGHrL9DndNWfortuj9hDoRtSlYiqcN45Zk2KiWZ/ukLx/ICxUnUG2FUKB22RQg8+3yfesF9tGO8Win4v4BrZlvXfFPyJYE06h/DnDJf+vcbtC/I85meOufkwPOxYudGO7NZIHyAgcVD31Nsk6xkJNRUS7nGqK7dxH8PPG8VZ9Q1IQCJg8y3jmLwF+GxWYXDud1sVbidmw0964Bl5KmLYzZMvOvj7+q4d8BpBYOWJm5nG8PO4veyJCLGecRXEMSoun74JZ9yUUCl2On9TG96dMq/AM+F1iin8upB1EJA6DYtXrdkqtqNoeBPao5I1EZsdODhc664PPY0/RfqHJzSl1+RArcXJx6St3y3YBM0mDyHBjBqkSLijIh7N8TrB+/Ry+ZSgubpQZzV//qgHkxI="
 
 before_install:
   - docker pull kontena/etcd:2.3.7
@@ -23,7 +26,6 @@ before_install:
 script:
   - bundle install --path vendor/bundle
   - bundle exec rspec spec/
-  - ETCD_ENDPOINT=http://localhost:2379 bundle exec rspec spec/
 
 deploy:
   - provider: script
