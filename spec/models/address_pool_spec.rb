@@ -5,6 +5,7 @@ describe AddressPool do
 
   before do
     EtcdModel.etcd = etcd
+    allow_any_instance_of(NodeHelper).to receive(:node).and_return('somehost')
   end
 
   it 'creates objects in etcd' do
@@ -14,7 +15,7 @@ describe AddressPool do
     ]))
     expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}')
     expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
-    expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16"}')
+    expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')
 
     expect(described_class.create('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"), gateway: IPAddr.new('10.81.0.1/16'))
   end
@@ -47,7 +48,7 @@ describe AddressPool do
       ]))
       expect(etcd).to receive(:set).with('/kontena/ipam/pools/kontena', prevExist: false, value: '{"subnet":"10.81.0.0/16","gateway":"10.81.0.1/16"}')
       expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/', dir: true, prevExist: false)
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16"}')
+      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')
 
       expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.81.0.0/16"), gateway: IPAddr.new('10.81.0.1/16'))
     end
@@ -83,17 +84,18 @@ describe AddressPool do
     ]
   end
 
-  context 'for a AddressPool' do
+  context 'for an AddressPool' do
     let :subject do
       described_class.new('kontena', subnet: IPAddr.new('10.81.0.0/16'), iprange: '10.81.128.0/17', gateway: IPAddr.new('10.81.0.1/16'))
     end
 
     it 'creates an address' do
-      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16"}')
+      expect(subject).to receive(:node).and_return('somehost')
+      expect(etcd).to receive(:set).with('/kontena/ipam/addresses/kontena/10.81.0.1', prevExist: false, value: '{"address":"10.81.0.1/16","node":"somehost"}')
 
       addr = subject.create_address(IPAddr.new('10.81.0.1'))
 
-      expect(addr).to eq Address.new('kontena', '10.81.0.1', address: IPAddr.new('10.81.0.1/16'))
+      expect(addr).to eq Address.new('kontena', '10.81.0.1', node: 'somehost', address: IPAddr.new('10.81.0.1/16'))
       expect(addr.address.to_cidr).to eq '10.81.0.1/16'
     end
 

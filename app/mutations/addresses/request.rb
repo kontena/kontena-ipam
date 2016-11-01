@@ -2,14 +2,8 @@ require 'ipaddr'
 
 module Addresses
   class Request < Mutations::Command
-    class AddressError < RuntimeError
-      attr_reader :sym
-      def initialize(sym)
-        @sym = sym
-      end
-    end
-
     include Logging
+    include RetryHelper
 
     required do
       model :policy
@@ -40,28 +34,31 @@ module Addresses
       else
         info "request dynamic address in pool #{@pool.id} with subnet #{@pool.subnet}"
 
-        request_dynamic
+        # should make progress given that we refresh the set of reserved addresses, and raise a different error if the pool is full
+        with_retry(Address::Conflict) do
+          request_dynamic
+        end
       end
-    rescue AddressError => error
-      add_error(:address, error.sym, error.message)
+    rescue Address::Conflict => error
+      add_error(:address, :conflict, "Allocation conflict for address #{address}: #{error}")
+
+    rescue AddressPool::Full => error
+      add_error(:pool, :full, error.message)
     end
 
     # Allocate static self.address within @pool.
     #
-    # @raise AddressError if reservation failed (conflict)
+    # @raise Address::Conflict
     # @return [Address] reserved address
     def request_static
       # reserve
       return @pool.create_address(self.address)
-
-    rescue Address::Conflict => error
-      raise AddressError.new(:conflict), "Allocation conflict for address #{self.address}: #{error.message}"
     end
 
     # Allocate dynamic address within @pool.
-    # Retries allocation on AddressConflict
     #
-    # @raise AddressError if allocation failed (pool is full)
+    # @raise Address::Conflict
+    # @raise AddressPool::Full
     # @return [Address] reserved address
     def request_dynamic
       available = @pool.available_addresses
@@ -70,17 +67,11 @@ module Addresses
 
       # allocate
       unless allocate_address = policy.allocate_address(available)
-        raise AddressError.new(:allocate), "No addresses available for allocation"
+        raise AddressPool::Full, "No addresses available for allocation in pool #{@pool}"
       end
 
       # reserve
       return @pool.create_address(allocate_address)
-
-    rescue Address::Conflict => error
-      warn "retry dynamic address allocation: #{error.message}"
-
-      # should make progress given that we refresh the set of reserved addresses, and raise a different error if the pool is full
-      retry
     end
   end
 end
