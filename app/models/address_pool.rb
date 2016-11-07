@@ -123,8 +123,8 @@ class AddressPool
 
   # Compute available addresses for allocation within pool
   #
-  # @return [Array<IPAddr>]
+  # @return [Enumerator<IPAddr>]
   def available_addresses
-    @subnet.hosts(range: allocation_range, exclude: reserved_addresses).to_a
+    @subnet.hosts(range: allocation_range, exclude: reserved_addresses)
   end
 end
