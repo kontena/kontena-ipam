@@ -63,10 +63,10 @@ module Addresses
     def request_dynamic
       available = @pool.available_addresses
 
-      info "pool #{@pool} allocates from #{@pool.allocation_range} and has #{available.length} available addresses"
+      info "pool #{@pool} allocates from #{@pool.allocation_range} and has #{available.size} available addresses"
 
       # allocate
-      unless allocate_address = policy.allocate_address(available)
+      unless allocate_address = policy.allocate_address(available.first(100).to_a)
         raise AddressPool::Full, "No addresses available for allocation in pool #{@pool}"
       end
 
