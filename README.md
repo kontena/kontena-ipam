@@ -10,13 +10,13 @@ See the [Design doc](/docs/design.md) for further details.
 
 ## Build
 
-    docker build -t kontena/ipam-plugin:latest .
+    docker build -t kontena/ipam-plugin .
 
 ## Usage (Docker)
 
 Run the plugin using Docker:
 
-    docker run --rm --name kontena-ipam --net host -v /run/docker/plugins:/run/docker/plugins kontena-ipam
+    docker run --rm --name kontena-ipam --net host -v /run/docker/plugins:/run/docker/plugins kontena/ipam-plugin
 
 ## Usage (Systemd)
 

@@ -1,12 +1,12 @@
 [Unit]
 Description=Kontena IPAM plugin
 
+# NOTE: systemd will activate the nspawn container with LISTEN_PID=1, and puma
+#       will ignore the LISTEN_FDS= unless it runs as PID 1
 [Socket]
 ListenStream=/run/docker/plugins/kontena-ipam.sock
 
 # Socket options matching Puma defaults
-# NOTE: systemd will activate the nspawn container with LISTEN_PID=1, and puma
-#       will ignore the LISTEN_FDS= unless it runs as PID 1
 NoDelay=true
 ReusePort=true
 Backlog=1024
