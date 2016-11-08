@@ -10,7 +10,7 @@ Environment=IMAGE=kontena-ipam
 Environment=TAG=latest
 ExecStart=/usr/bin/systemd-nspawn --machine kontena-ipam \
   --directory /var/lib/machines/${IMAGE}:${TAG} --read-only --link-journal=no \
-  --bind /run/docker/plugins/ --chdir /app \
+  --chdir /app \
   --setenv LOG_LEVEL=0 --setenv ETCD_ENDPOINT=http://127.0.0.1:2379 \
   --setenv PUMA_DEBUG=1 \
   -- bundle exec --keep-file-descriptors puma --debug \
