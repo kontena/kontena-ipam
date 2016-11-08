@@ -203,7 +203,7 @@ describe AddressPool do
       it 'returns the reduced subnet pool' do
         expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
 
-        addresses = subject.available_addresses
+        addresses = subject.available_addresses.to_a
 
         expect(addresses.first).to eq IPAddr.new('10.80.0.1/24')
         expect(addresses).to eq (IPAddr.new('10.80.0.1/24')..IPAddr.new('10.80.0.254/24')).to_a
@@ -217,7 +217,7 @@ describe AddressPool do
           instance_double(Etcd::Node, key: '/kontena/ipam/addresses/kontena/10.80.0.1', directory?: false, value: '{"address": "10.80.0.1/24"}'),
         ]))
 
-        addresses = subject.available_addresses
+        addresses = subject.available_addresses.to_a
 
         expect(addresses.first).to eq IPAddr.new('10.80.0.2/24')
         expect(addresses).to eq (IPAddr.new('10.80.0.2/24')..IPAddr.new('10.80.0.254/24')).to_a
@@ -270,10 +270,15 @@ describe AddressPool do
     end
 
     describe '#available_addresses' do
+      it 'returns enumerator' do
+        expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
+        expect(subject.available_addresses).to be_instance_of(Enumerator)
+      end
+
       it 'returns the full iprange pool' do
         expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
 
-        addresses = subject.available_addresses
+        addresses = subject.available_addresses.to_a
 
         expect(addresses.first).to eq IPAddr.new('10.81.1.0/16')
         expect(addresses).to eq (IPAddr.new('10.81.1.0/16')..IPAddr.new('10.81.1.7/16')).to_a
@@ -286,7 +291,7 @@ describe AddressPool do
           instance_double(Etcd::Node, key: "/kontena/ipam/addresses/test/#{a.to_s}", directory?: false, value: {'address' => a}.to_json)
         }))
 
-        expect(subject.available_addresses).to eq available
+        expect(subject.available_addresses.to_a).to eq available
       end
     end
   end
@@ -307,7 +312,7 @@ describe AddressPool do
       it 'returns the reduced iprange' do
         expect(etcd).to receive(:get).with('/kontena/ipam/addresses/test/').and_return(instance_double(Etcd::Response, directory?: true, children: []))
 
-        addresses = subject.available_addresses
+        addresses = subject.available_addresses.to_a
 
         expect(addresses.first).to eq IPAddr.new('10.81.0.1/16')
         expect(addresses).to eq (IPAddr.new('10.81.0.1/16')..IPAddr.new('10.81.0.255/16')).to_a
