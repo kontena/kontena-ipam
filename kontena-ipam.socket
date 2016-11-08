@@ -1,0 +1,13 @@
+[Unit]
+Description=Kontena IPAM plugin
+
+[Socket]
+ListenStream=/run/docker/plugins/kontena-ipam.sock
+
+# Socket options matching Puma defaults
+NoDelay=true
+ReusePort=true
+Backlog=1024
+
+[Install]
+WantedBy=sockets.target
