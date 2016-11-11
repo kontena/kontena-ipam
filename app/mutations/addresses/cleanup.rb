@@ -5,7 +5,9 @@ module Addresses
 
     required do
       string :pool_id
-      array :addresses, class: IPAddr
+      array :addresses do
+        ipaddr
+      end
     end
 
     def validate
