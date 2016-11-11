@@ -31,7 +31,10 @@ module Commands
 
     def execute
       if self.docker_networks
+        etcd_index = EtcdModel.etcd.get_index
+
         info "Cleanup Docker networks..."
+        debug "Cleanup upto etcd_index=#{etcd_index}"
 
         docker_client = DockerClient.new
         docker_client.ipam_networks_addresses do |network, pool, addresses|
@@ -41,7 +44,7 @@ module Commands
             pool_id: pool,
             addresses: addresses,
 
-            etcd_index_upto: self.etcd_index_upto,
+            etcd_index_upto: etcd_index,
           )
         end
       end

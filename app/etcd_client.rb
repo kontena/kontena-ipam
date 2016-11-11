@@ -27,6 +27,11 @@ class EtcdClient < Etcd::Client
     @version ||= JSON.parse(api_execute('/version', :get).body)
   end
 
+  # Return current etcd index
+  def get_index(path: '/')
+    get(path).etcd_index
+  end
+
   # Monkey-patch to fix missing Content-Type for body
   def build_http_request(klass, path, params = nil, body = nil)
     req = super
