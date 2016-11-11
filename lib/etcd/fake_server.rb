@@ -56,21 +56,47 @@ end
 =end
 class Etcd::FakeServer < Etcd::ServerBase
   class Node
-      attr_reader :key, :value, :nodes
+      attr_reader :key, :created_index, :modified_index, :value, :nodes
 
-      def initialize(key, value: nil, nodes: nil)
+      def initialize(key, index, value: nil, nodes: nil)
         @key = key
+        @created_index = index
+        @modified_index = index
         @value = value
         @nodes = nodes
+      end
+
+      def parent_path
+        File.dirname(key)
       end
 
       def directory?
         @nodes != nil
       end
 
+      def update(index, value)
+        @modified_index = index
+        @value = value
+      end
+      def delete(index)
+        @modified_index = index
+        @nodes = {} if @nodes
+      end
+
+      # @raise [TypeError] if not a directory
+      def link(node)
+        # @nodes will be nil if not a directory
+        @nodes[node.key] = node
+      end
+      def unlink(node)
+        @nodes.delete(node.key)
+      end
+
       def serialize(recursive: false, toplevel: true)
         obj = {
           'key' => @key,
+          'createdIndex' => @created_index,
+          'modifiedIndex' => @modified_index,
         }
 
         if directory?
@@ -112,48 +138,70 @@ class Etcd::FakeServer < Etcd::ServerBase
 
   protected
 
-  # Lookup a (normalized) key as a directory node
-  def mkdir(key)
-    @nodes[key] ||= Node.new(key, nodes: {})
+  def initialize(*args)
+    super
+    reset!
+  end
+
+  # Link the directory node at the given path with the given child node
+  # @return [Node] directory node
+  def mkdir(path)
+    @nodes[path] ||= Node.new(path, @index, nodes: {})
   end
 
   # Lookup a key
   def read(key)
-    key = '/' + key unless key.start_with? '/'
     key = key.chomp('/')
+    key = '/' + key unless key.start_with? '/'
 
     return key, @nodes[key]
   end
 
   # Write a node
-  def write(node)
-    path = node.key
+  def write(path, **attrs)
+    @index += 1
 
-    @nodes[path] = node
+    @nodes[path] = node = Node.new(path, @index, **attrs)
 
     # create parent dirs
-    until path == '/'
-      path = File.dirname(path)
-      parent = mkdir(path)
-      parent.nodes[node.key] = node
-      node = parent
+    child = node
+    until child.key == '/'
+      parent = mkdir(child.parent_path)
+      parent.link(child)
+      child = parent
     end
+
+    node
   end
 
-  def remove(node, toplevel: true)
-    if toplevel
-      dir = File.dirname(node.key)
+  def update(node, value)
+    @index += 1
 
-      @nodes[dir].nodes.delete(node.key)
-    end
+    node.update(@index, value)
+  end
 
+  # recursively unlink node and any child nodes
+  def unlink(node)
     @nodes.delete(node.key)
 
     if node.directory?
       for key, node in node.nodes
-        remove(node, toplevel: false)
+        unlink(node)
       end
     end
+  end
+
+  def remove(node)
+    @index += 1
+
+    # unlink from parent
+    @nodes[node.parent_path].unlink(node)
+
+    # remove from @nodes
+    unlink(node)
+
+    # mark node as deleted
+    node.delete(@index)
   end
 
   # Log an operation
@@ -162,10 +210,6 @@ class Etcd::FakeServer < Etcd::ServerBase
     path += '/' if node.directory?
 
     @logs << [action, path]
-  end
-
-  def modified!
-    @modified = true
   end
 
   # Yield all nodes under root
@@ -183,9 +227,13 @@ class Etcd::FakeServer < Etcd::ServerBase
   #
   # Initializes an empty database.
   def reset!
+    @index = 0
     @nodes = {}
     @logs = []
     @modified = false
+
+    mkdir('/')
+    @start_index = @index
   end
 
   # Load a hash of nodes into the store.
@@ -196,19 +244,21 @@ class Etcd::FakeServer < Etcd::ServerBase
   def load!(tree)
     load_nodes(tree) do |key, value|
       if value == :directory
-        write Node.new(key,
-          nodes: {},
-        )
+        write key, nodes: {}
       else
-        write Node.new(key,
-          value: value,
-        )
+        write key, value: value
       end
     end
+    @start_index = @index
+  end
+
+  # Return etcd index at start of test
+  def etcd_index
+    @start_index
   end
 
   def modified?
-    @modified
+    @index > @start_index
   end
 
   def logs
@@ -244,27 +294,32 @@ class Etcd::FakeServer < Etcd::ServerBase
       raise Error.new(412, 105, key), "Key already exists"
     elsif prevExist == true && !node
       raise Error.new(404, 100, key), "Key not found"
-    elsif dir && node
+    end
+
+    if dir && node
       raise Error.new(403, 102, key), "Not a file"
-    end
+    elsif node
+      action = :set
+      prev_node = node.serialize
 
-    action = node ? :set : :create
-
-    set_node = if dir
-      Node.new(key, nodes: {})
+      update node, value
     else
-      Node.new(key, value: value)
+      action = :create
+      prev_node = nil
+
+      node = if dir
+        write key, nodes: {}
+      else
+        write key, value: value
+      end
     end
 
-    log! action, set_node
-
-    write set_node
-    modified!
+    log! action, node
 
     return {
       'action' => action,
-      'node' => set_node,
-      'prevNode' => node,
+      'node' => node.serialize,
+      'prevNode' => prev_node,
     }
   end
 
@@ -284,7 +339,6 @@ class Etcd::FakeServer < Etcd::ServerBase
     log! :delete, node
 
     remove(node)
-    modified!
 
     return {
       'action' => 'delete',
