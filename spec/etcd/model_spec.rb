@@ -160,7 +160,10 @@ describe EtcdModel do
         )
         expect(etcd).to receive(:get).with('/kontena/ipam/test/test1').and_call_original
 
-        expect(TestEtcd.get('test1')).to eq TestEtcd.new('test1', field: "value")
+        subject = TestEtcd.get('test1')
+
+        expect(subject).to eq TestEtcd.new('test1', field: "value")
+        expect(subject.etcd_index).to be >= etcd_server.etcd_index
 
         expect(etcd_server).to_not be_modified
       end
@@ -189,7 +192,10 @@ describe EtcdModel do
       it 'returns new object stored to etcd', :etcd => true do
         expect(etcd).to receive(:set).with('/kontena/ipam/test/test1', prevExist: false, value: '{"field":"value"}').and_call_original
 
-        expect(TestEtcd.create('test1', field: "value")).to eq TestEtcd.new('test1', field: "value")
+        subject = TestEtcd.create('test1', field: "value")
+
+        expect(subject).to eq TestEtcd.new('test1', field: "value")
+        expect(subject.etcd_index).to be > etcd_server.etcd_index
 
         expect(etcd_server.logs).to eq [
           [:create, '/kontena/ipam/test/test1'],
@@ -274,10 +280,15 @@ describe EtcdModel do
 
       expect(etcd).to receive(:get).with('/kontena/ipam/test/').and_call_original
 
-      expect(TestEtcd.list().sort).to eq [
+      subject = TestEtcd.list
+
+      expect(subject.sort).to eq [
         TestEtcd.new('test1', field: "value 1"),
         TestEtcd.new('test2', field: "value 2"),
       ]
+      subject.each do |item|
+        expect(item.etcd_index).to be > 0
+      end
 
       expect(etcd_server).to_not be_modified
     end
@@ -310,7 +321,10 @@ describe EtcdModel do
 
         expect(etcd).to receive(:delete).with('/kontena/ipam/test/test1').and_call_original
 
-        TestEtcd.new('test1').delete!
+        subject = TestEtcd.new('test1')
+        subject.delete!
+
+        expect(subject.etcd_index).to be > etcd_server.etcd_index
 
         expect(etcd_server.logs).to eq [
           [:delete, '/kontena/ipam/test/test1'],
