@@ -29,5 +29,6 @@ require_relative 'mutations/address_pools/cleanup'
 require_relative 'mutations/addresses/request'
 require_relative 'mutations/addresses/release'
 require_relative 'mutations/addresses/cleanup'
+require_relative 'commands/cleanup'
 
 $stdout.sync = true
