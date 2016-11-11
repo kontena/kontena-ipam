@@ -7,6 +7,7 @@ module Mutations
 
     def filter(data)
       return [data, :nils] if data.nil?
+      return [data, nil] if data.is_a? IPAddr
       return [data, :empty] if data.empty?
 
       ipaddr = IPAddr.new(data)
