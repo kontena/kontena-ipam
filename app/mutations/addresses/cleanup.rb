@@ -10,6 +10,10 @@ module Addresses
       end
     end
 
+    optional do
+      integer :etcd_index_upto
+    end
+
     def validate
       @node = node
       @ipset = IPSet.new(self.addresses.map{|ipaddr| ipaddr.to_host})
@@ -25,7 +29,6 @@ module Addresses
           end
         end
       end
-
     end
 
     def execute
@@ -42,6 +45,9 @@ module Addresses
 
         elsif @ipset.include?(address.address.to_host)
           debug "..still in use, skipping"
+
+        elsif self.etcd_index_upto && address.etcd_modified?(after_index: self.etcd_index_upto)
+          debug "...recently allocated, skipping"
 
         else
           warn "Cleanup unused address #{address.address.to_host}"

@@ -4,6 +4,7 @@ module Commands
   class Cleanup
     include Logging
 
+    attr_accessor :etcd_index_upto
     attr_accessor :docker_networks
     attr_accessor :pool
     attr_accessor :addresses
@@ -13,6 +14,9 @@ module Commands
 
       OptionParser.new do |opts|
         opts.banner = "Usage: kontena-ipam-cleanup [--docker-networks] [--pool POOL IPADDR...]"
+        opts.on("--etcd-index-upto=INDEX", Integer, "Only cleanup nodes created <= given etcd index") do |index|
+          command.etcd_index_upto = index
+        end
         opts.on("--docker-networks", "Cleanup Docker networks") do |flag|
           command.docker_networks = flag
         end
@@ -36,6 +40,8 @@ module Commands
           Addresses::Cleanup.run!(
             pool_id: pool,
             addresses: addresses,
+
+            etcd_index_upto: self.etcd_index_upto,
           )
         end
       end
@@ -46,6 +52,8 @@ module Commands
         Addresses::Cleanup.run!(
           pool_id: self.pool,
           addresses: self.addresses,
+
+          etcd_index_upto: self.etcd_index_upto,
         )
       end
     end
