@@ -91,6 +91,11 @@ class Etcd::TestServer < Etcd::ServerBase
     end
   end
 
+  # Return the initial un-modified etcd index after the load!
+  def etcd_index
+    @etcd_index
+  end
+
   # Has the store been modified since reset()?
   #
   # This does not count failed set operations
