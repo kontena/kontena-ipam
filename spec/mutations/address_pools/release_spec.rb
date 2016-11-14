@@ -43,8 +43,8 @@ describe AddressPools::Release do
       it 'releases the PoolNode and skips the pool delete if still in use' do
         subject = described_class.new(pool_id: 'kontena')
 
-        expect(PoolNode).to receive(:delete).with('kontena', "somehost")
-        expect(PoolNode).to receive(:rmdir).with('kontena').and_raise(PoolNode::Conflict)
+        expect(pool).to receive(:release!)
+        expect(pool).to receive(:delete!).and_raise(PoolNode::Conflict)
 
         outcome = subject.run
 
@@ -54,11 +54,8 @@ describe AddressPools::Release do
       it 'releases the PoolNode and deletes the pool if not in use anymore' do
         subject = described_class.new(pool_id: 'kontena')
 
-        expect(PoolNode).to receive(:delete).with('kontena', "somehost")
-        expect(PoolNode).to receive(:rmdir).with('kontena')
-        expect(etcd).to receive(:delete).with('/kontena/ipam/pools/kontena')
-        expect(Address).to receive(:delete).with('kontena')
-        expect(Subnet).to receive(:delete).with(IPAddr.new('10.80.0.0/16'))
+        expect(pool).to receive(:release!)
+        expect(pool).to receive(:delete!)
 
         outcome = subject.run
 
