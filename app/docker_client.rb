@@ -6,12 +6,12 @@ require_relative 'logging'
 class DockerClient
   include Logging
 
-  # Collect all known addresses of local docker networks using this ipam
-  # @yield [network, pool, addresses] local Docker networks with active endpoints
-  # @yieldparam network [String] name of Docker network
+  # Collect all known addresses of local Docker networks using this IPAM Driver
+  #
+  # @yield [pool, addresses] local Docker networks with active endpoints
   # @yieldparam pool [String] name of Kontena IPAM pool
   # @yieldparam addresses [Array<IPAddr>] active container endpoint addresses, not including gateway or auxiliar addresses
-  def ipam_networks_addresses
+  def networks_addresses
     Docker::Network.all.each do |network|
       network_info = network.json
       name = network_info['Name']
@@ -36,8 +36,32 @@ class DockerClient
           IPAddr.new(container_info['IPv4Address'])
         }
 
-        yield name, ipam_pool, addresses
+        yield ipam_pool, addresses
       end
     end
-   end
+  end
+
+  # Collect all known addresses of local Docker containers using the given labels
+  #
+  def containers_addresses(pool_label, addr_label)
+    pools = { }
+
+    Docker::Container.all(all: true).each do |container|
+      info = container.info
+      name = info['Names'].first
+      labels = info['Labels']
+      pool = labels[pool_label]
+      addr = labels[addr_label]
+
+      debug "Scanning container #{name}: pool=#{pool} addr=#{addr}"
+
+      if pool && addr
+        (pools[pool] ||= []) << addr
+      end
+    end
+
+    pools.each_pair do |pool, addr|
+      yield pool, addr
+    end
+  end
 end
