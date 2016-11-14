@@ -8,6 +8,7 @@ module Commands
     attr_accessor :docker_networks
     attr_accessor :docker_container_pool_label
     attr_accessor :docker_container_addr_label
+    attr_accessor :pool
 
     def self.parse(argv)
       command = new
@@ -17,14 +18,17 @@ module Commands
         opts.on("--quiesce-sleep=SECONDS", Integer, "Wait for concurrent operations to complete") do |seconds|
           command.quiesce_sleep = seconds
         end
-        opts.on("--docker-networks", "Cleanup Docker networks") do |flag|
+        opts.on("--docker-networks", "Scan Docker network endpoints") do |flag|
           command.docker_networks = flag
         end
-        opts.on("--docker-container-pool-label", "Cleanup Docker containers by pool label") do |label|
+        opts.on("--docker-container-pool-label", "Scan Docker containers by pool label") do |label|
           command.docker_container_pool_label = label
         end
-        opts.on("--docker-container-address-label", "Cleanup Docker containers by address label") do |label|
+        opts.on("--docker-container-address-label", "Scan Docker containers by address label") do |label|
           command.docker_container_addr_label = label
+        end
+        opts.on("--pool=POOL", "Scan pool for cleanup even if not in use by any containers") do |pool|
+          command.pool = pool
         end
       end.parse!(argv)
 
@@ -36,11 +40,25 @@ module Commands
     end
 
     def docker_scan(&block)
-      if self.docker_networks
-        docker_client.networks_addresses &block
-      elsif self.docker_container_pool_label && self.docker_container_addr_label
-        docker_client.containers_addresses(self.docker_container_pool_label, self.docker_container_addr_label, &block)
+      pools = { }
+
+      if self.pool
+        pools[self.pool] = []
       end
+
+      if self.docker_networks
+        docker_client.networks_addresses do |pool, address|
+          (pools[pool] ||= []) << address
+        end
+      end
+
+      if self.docker_container_pool_label && self.docker_container_addr_label
+        docker_client.containers_addresses self.docker_container_pool_label, self.docker_container_addr_label do |pool, address|
+          (pools[pool] ||= []) << address
+        end
+      end
+
+      pools.each_pair &block
     end
 
     def execute

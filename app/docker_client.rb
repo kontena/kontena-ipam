@@ -8,7 +8,7 @@ class DockerClient
 
   # Collect all known addresses of local Docker networks using this IPAM Driver
   #
-  # @yield [pool, addresses] local Docker networks with active endpoints
+  # @yield [pool, address] active endpoint on Docker network
   # @yieldparam pool [String] name of Kontena IPAM pool
   # @yieldparam addresses [Array<IPAddr>] active container endpoint addresses, not including gateway or auxiliar addresses
   def networks_addresses
@@ -30,13 +30,11 @@ class DockerClient
       else
         debug "Kontena IPAM network #{name}: pool=#{ipam_pool} containers=#{containers.size}"
 
-        addresses = containers.map { |container_id, container_info|
+        containers.each { |container_id, container_info|
           debug "container #{container_id}: #{container_info}"
 
-          IPAddr.new(container_info['IPv4Address'])
+          yield ipam_pool, IPAddr.new(container_info['IPv4Address'])
         }
-
-        yield ipam_pool, addresses
       end
     end
   end
@@ -56,12 +54,8 @@ class DockerClient
       debug "Scanning container #{name}: pool=#{pool} addr=#{addr}"
 
       if pool && addr
-        (pools[pool] ||= []) << addr
+        yield pool, addr
       end
-    end
-
-    pools.each_pair do |pool, addr|
-      yield pool, addr
     end
   end
 end

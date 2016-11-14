@@ -83,9 +83,7 @@ describe DockerClient do
         docker_networks.map{|json| instance_double(Docker::Network, json: json) }
       }
 
-      expect{|block| subject.networks_addresses(&block)}.to yield_with_args('kontena', 'kontena', [
-          IPAddr.new('10.81.128.2/16'),
-      ])
+      expect{|block| subject.networks_addresses(&block)}.to yield_with_args('kontena', IPAddr.new('10.81.128.2/16'))
     end
   end
 
@@ -196,9 +194,9 @@ describe DockerClient do
         docker_containers.map{|info| instance_double(Docker::Container, info: info)}
       }
 
-      expect{|block| subject.containers_addresses('io.kontena.container.overlay_network', 'io.kontena.container.overlay_cidr', &block)}.to yield_with_args('kontena', [
-          IPAddr.new('10.81.1.100/16'),
-      ])
+      expect{|block|
+        subject.containers_addresses('io.kontena.container.overlay_network', 'io.kontena.container.overlay_cidr', &block)
+      }.to yield_with_args('kontena', IPAddr.new('10.81.1.100/16'))
     end
   end
 end
