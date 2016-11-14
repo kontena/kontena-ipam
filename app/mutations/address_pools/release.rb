@@ -16,7 +16,12 @@ module AddressPools
 
     def execute
       @pool.release!
-      @pool.cleanup
+
+      if @pool.cleanup
+        info "Release pool=#{@pool.id}: cleanup deleted"
+      else
+        info "Release pool=#{@pool.id}: cleanup skipped"
+      end
     end
   end
 end

@@ -22,9 +22,17 @@ module Addresses
     end
 
     def execute
-      info "releasing address: #{self.address} in pool: #{@pool_id}"
       address = @pool.get_address(self.address)
-      if address && address.address.to_host != @pool.gateway.to_host
+
+      if !address
+        info "Skip missing address=#{self.address} in pool=#{@pool.id}"
+
+      elsif address.address.to_host == @pool.gateway.to_host
+        info "Skip gateway address=#{address.id} in pool=#{@pool.id}"
+
+      else
+        info "Delete address=#{address.id} in pool=#{@pool.id}"
+
         address.delete!
       end
     end

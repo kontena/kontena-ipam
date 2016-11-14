@@ -284,7 +284,7 @@ describe IpamPlugin do
         data = api_post '/IpamDriver.RequestAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
 
         expect(last_response.status).to eq(400), last_response.errors
-        expect(data['Error']).to match(%r{Allocation conflict for address 10.80.0.1: Create conflict with /kontena/ipam/addresses/test/10.80.0.1@\d+: Key already exists})
+        expect(data['Error']).to match(%r{Allocation conflict for address=10.80.0.1: Create conflict with /kontena/ipam/addresses/test/10.80.0.1@\d+: Key already exists})
 
         expect(etcd_server).to_not be_modified, etcd_server.logs.inspect
       end

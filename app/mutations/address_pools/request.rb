@@ -26,18 +26,18 @@ module AddressPools
 
     def execute
       if pool = AddressPool.get(self.network)
-        info "request existing network #{network} pool with subnet=#{pool.subnet}"
+        info "Request existing network=#{network} pool: #{pool.id} subnet=#{pool.subnet}"
 
       elsif self.subnet
-        info "request static network #{network} pool: subnet=#{self.subnet}"
-
         pool = request_static
-      else
-        info "request dynamic network #{network} pool"
 
+        info "Request static network=#{network} pool: #{pool.id} subnet=#{pool.subnet.to_cidr}"
+      else
         pool = with_retry(Subnet::Conflict) {
            request_dynamic
         }
+
+        info "Request dynamic network=#{network} pool: #{pool.id} subnet=#{pool.subnet.to_cidr}"
       end
 
       pool = verify(pool)

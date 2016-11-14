@@ -28,19 +28,21 @@ module Addresses
 
     def execute
       if self.address
-        info "request static address #{self.address} in pool #{@pool.id} with subnet #{@pool.subnet}"
+        address = request_static
 
-        request_static
+        info "Request static address in pool=#{@pool.id} with subnet=#{@pool.subnet}: address=#{address.id}"
       else
-        info "request dynamic address in pool #{@pool.id} with subnet #{@pool.subnet}"
-
         # should make progress given that we refresh the set of reserved addresses, and raise a different error if the pool is full
-        with_retry(Address::Conflict) do
+        address = with_retry(Address::Conflict) do
           request_dynamic
         end
+
+        info "Request dynamic address in pool=#{@pool.id} with subnet=#{@pool.subnet}: address=#{address.id}"
       end
+
+      return address
     rescue Address::Conflict => error
-      add_error(:address, :conflict, "Allocation conflict for address #{address}: #{error}")
+      add_error(:address, :conflict, "Allocation conflict for address=#{self.address}: #{error}")
 
     rescue AddressPool::Full => error
       add_error(:pool, :full, error.message)
@@ -61,12 +63,12 @@ module Addresses
     # @raise AddressPool::Full
     # @return [Address] reserved address
     def request_dynamic
-      available = @pool.available_addresses
+      available = @pool.available_addresses.first(100).to_a
 
-      info "pool #{@pool} allocates from #{@pool.allocation_range} and has #{available.size} available addresses"
+      info "Allocate dynamic address in pool=#{@pool.id} from range=#{@pool.allocation_range} with available=#{available.size}#{available.size >= 100 ? '+' : ''} addresses"
 
       # allocate
-      unless allocate_address = policy.allocate_address(available.first(100).to_a)
+      unless allocate_address = policy.allocate_address(available)
         raise AddressPool::Full, "No addresses available for allocation in pool #{@pool}"
       end
 
