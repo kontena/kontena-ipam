@@ -103,7 +103,7 @@ class IpamPlugin < Sinatra::Application
 
     json(
       'Address' => address.address.to_cidr,
-      'Data'    => {},
+      'Data'    => {}, # Hash<String, String>; ignored by Docker
     )
   end
 
