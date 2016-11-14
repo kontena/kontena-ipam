@@ -274,6 +274,10 @@ class Etcd::FakeServer < Etcd::ServerBase
     }
   end
 
+  def index
+    @index
+  end
+
   def get(key, recursive: nil)
     key, node = read(key)
 
@@ -371,7 +375,11 @@ class Etcd::FakeServer < Etcd::ServerBase
     end
 
     def respond(status, object)
-      return status, { 'Content-Type' => 'application/json' }, object.to_json
+      headers = {
+        'Content-Type' => 'application/json',
+        'X-Etcd-Index' => @server.index,
+      }
+      return status, headers, object.to_json
     end
 
     get '/version' do
