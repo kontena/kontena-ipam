@@ -15,64 +15,115 @@ describe Commands::Cleanup do
       )
     end
 
-    context "With a single address string for the pool" do
+    context "When scanning Docker with no active containers" do
       subject do
-        subject = described_class.new
-        subject.pool = 'test1'
-        subject.addresses = [
-          '10.80.1.111/24',
-        ]
-        subject
-      end
-
-      describe '#execute' do
-        it 'removes only unused addresses owned by this node' do
-          expect{subject.execute}.to_not raise_error
-
-          expect(etcd_server).to be_modified
-          expect(etcd_server.nodes).to eq({
-            '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
-            '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
-            '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
-            '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
-            '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
-          })
-        end
-      end
-    end
-
-    context "With a single address string for the pool upto a given etcd index" do
-      subject do
-        subject = described_class.new
-        subject.etcd_index_upto = etcd_server.etcd_index
-        subject.pool = 'test1'
-        subject.addresses = [
-          '10.80.1.111/24',
-        ]
-        subject
+        described_class.parse([''])
       end
 
       before do
-        subject()
-
-        # create a new address node with an etcd_index after the initial etcd index used in subject()
-        etcd.set '/kontena/ipam/addresses/test1/10.80.1.112', value: { 'address' => '10.80.1.112/24', 'node' => '1' }.to_json
+        expect(subject).to receive(:docker_scan).and_yield('test1', [])
       end
 
-      describe '#execute' do
-        it 'removes only unused addresses owned by this node allocated before the initial etcd indnex' do
-          expect{subject.execute}.to_not raise_error
+      it "Removes all unused addresses owned by this node" do
+        expect{subject.execute}.to_not raise_error
 
-          expect(etcd_server).to be_modified
-          expect(etcd_server.nodes).to eq({
-            '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
-            '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
-            '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
-            '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
-            '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
-            '/kontena/ipam/addresses/test1/10.80.1.112' => { 'address' => '10.80.1.112/24', 'node' => '1' },
-          })
-        end
+        expect(etcd_server).to be_modified
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+        })
+      end
+    end
+
+    context "With one active Docker container" do
+      subject do
+        described_class.parse([''])
+      end
+
+      before do
+        expect(subject).to receive(:docker_scan).and_yield('test1', [
+          IPAddr.new('10.80.1.111/24'),
+        ])
+      end
+
+      it "Only removes unused addresses owned by this node" do
+        expect{subject.execute}.to_not raise_error
+
+        expect(etcd_server).to be_modified
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+          '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
+        })
+      end
+    end
+
+    context "With one concurrent address allocation" do
+      subject do
+        described_class.parse(['--quiesce-sleep=10'])
+      end
+
+      before do
+        expect(subject).to receive(:sleep) {
+          # simulate a concurrent address request during the sleep period, which does not yet show up in the scan
+          etcd.set '/kontena/ipam/addresses/test1/10.80.1.112', value: { 'address' => '10.80.1.112/24', 'node' => '1' }.to_json
+        }
+
+        expect(subject).to receive(:docker_scan).and_yield('test1', [
+          IPAddr.new('10.80.1.111/24'),
+        ])
+      end
+
+      it "Only removes unused addresses owned by this node" do
+        expect{subject.execute}.to_not raise_error
+
+        expect(etcd_server).to be_modified
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+          '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.112' => { 'address' => '10.80.1.112/24', 'node' => '1' },
+        })
+      end
+    end
+
+    context "With one pending address allocation" do
+      subject do
+        described_class.parse(['--quiesce-sleep=10'])
+      end
+
+      before do
+        # simulate an in-progress address request during the cleanup operation
+        etcd.set '/kontena/ipam/addresses/test1/10.80.1.112', value: { 'address' => '10.80.1.112/24', 'node' => '1' }.to_json
+
+        expect(subject).to receive(:sleep) {
+          # the in-progress address request completes
+        }
+
+        expect(subject).to receive(:docker_scan).and_yield('test1', [
+          IPAddr.new('10.80.1.111/24'),
+          IPAddr.new('10.80.1.112/24'),
+        ])
+      end
+
+      it "Only removes unused addresses owned by this node" do
+        expect{subject.execute}.to_not raise_error
+
+        expect(etcd_server).to be_modified
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+          '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.112' => { 'address' => '10.80.1.112/24', 'node' => '1' },
+        })
       end
     end
 
