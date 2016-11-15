@@ -123,4 +123,22 @@ class IpamPlugin < Sinatra::Application
 
     json({})
   end
+
+  get '/KontenaIPAM.Cleanup' do
+    params = Addresses::Cleanup.prep
+
+    json({
+      'EtcdIndex' => params[:etcd_index],
+    })
+  end
+
+  post '/KontenaIPAM.Cleanup' do
+    Addresses::Cleanup.run!(
+      pool_id: params['PoolID'],
+      addresses: params['Addresses'],
+      etcd_index_upto: params['EtcdIndex'],
+    )
+
+    json({})
+  end
 end

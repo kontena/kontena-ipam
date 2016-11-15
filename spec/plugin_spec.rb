@@ -34,6 +34,16 @@ describe IpamPlugin do
     end
   end
 
+  def api_get(url)
+    get url
+
+    if last_response.content_type == 'application/json'
+      JSON.parse(last_response.body)
+    else
+      last_response.body
+    end
+  end
+
   describe '/Plugin.Activate', :etcd => true do
     it 'implements IpamDriver' do
       data = api_post '/Plugin.Activate', nil
@@ -476,6 +486,88 @@ describe IpamPlugin do
           '/kontena/ipam/pool-nodes/test1/someotherhost' => {},
           '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24' },
           '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24' },
+        })
+      end
+    end
+  end
+
+  describe 'GET /KontenaIPAM.Cleanup' do
+    it "Returns the current etcd index", :etcd => true do
+      data = api_get '/KontenaIPAM.Cleanup'
+
+      expect(last_response).to be_ok, last_response.errors
+      expect(data).to eq({ 'EtcdIndex' => etcd_server.etcd_index })
+    end
+  end
+
+  describe 'POST /KontenaIPAM.Cleanup' do
+    it "Errors for a missing addresses parameter" do
+      data = api_post '/KontenaIPAM.Cleanup', {
+        'PoolID'    => 'test1',
+        'Addreses'  => [ '127.0.0.1' ],
+      }
+
+      expect(last_response.status).to eq(400), last_response.errors
+      expect(data['Error']).to match(%r{Addresses can't be nil})
+    end
+
+    context "for etcd with multiple reserved addresses", :etcd => true do
+      before do
+        allow_any_instance_of(NodeHelper).to receive(:node).and_return('1')
+
+        etcd_server.load!(
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.100' => { 'address' => '10.80.1.100/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+          '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' }
+        )
+      end
+
+      it "Removes all addresses owned by this node" do
+        data = api_post '/KontenaIPAM.Cleanup', {
+          'PoolID'    => 'test1',
+          'Addresses' => [],
+        }
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({ })
+
+        expect(etcd_server).to be_modified
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/addresses/test1/10.80.1.100'],
+          [:delete, '/kontena/ipam/addresses/test1/10.80.1.111'],
+        ]
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+        })
+      end
+
+      it "Only removes unused addresses owned by this node" do
+        data = api_post '/KontenaIPAM.Cleanup', {
+          'PoolID' => 'test1',
+          'Addresses' => [
+            '10.80.1.111/24'
+          ],
+        }
+
+        expect(last_response).to be_ok, last_response.errors
+        expect(data).to eq({ })
+
+        expect(etcd_server).to be_modified
+        expect(etcd_server.logs).to eq [
+          [:delete, '/kontena/ipam/addresses/test1/10.80.1.100'],
+        ]
+        expect(etcd_server.nodes).to eq({
+          '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
+          '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
+          '/kontena/ipam/addresses/test1/10.80.1.1' => { 'address' => '10.80.1.1/24', 'node' => '1' },
+          '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
+          '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
         })
       end
     end
