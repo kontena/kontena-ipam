@@ -38,24 +38,4 @@ class DockerClient
       end
     end
   end
-
-  # Collect all known addresses of local Docker containers using the given labels
-  #
-  def containers_addresses(pool_label, addr_label)
-    pools = { }
-
-    Docker::Container.all(all: true).each do |container|
-      info = container.info
-      name = info['Names'].first
-      labels = info['Labels']
-      pool = labels[pool_label]
-      addr = labels[addr_label]
-
-      debug "Scanning container #{name}: pool=#{pool} addr=#{addr}"
-
-      if pool && addr
-        yield pool, addr
-      end
-    end
-  end
 end
