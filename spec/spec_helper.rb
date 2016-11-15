@@ -70,7 +70,7 @@ RSpec.configure do |config|
 
   # kill etcd queries for non-etcd examples
   config.before(:each) do
-    EtcdModel.etcd = double()
+    EtcdModel.etcd = instance_double(EtcdClient)
   end
 
   config.before(:each, :etcd => true) do

@@ -376,11 +376,14 @@ module EtcdModel
     base.const_set :NotFound, Class.new(EtcdModel::NotFound)
   end
 
+  attr_accessor :etcd_node
+
   # Initialize from etcd key values and JSON attrs
   #
   # @param keys [Array<String>] EtcdModel key values
   # @param attrs [Hash<Symbol, EtcdModel>] JSONModel attribute values
   def initialize(*keys, **attrs)
+    @etcd_node = nil
     self.class.etcd_schema.each_key_value(*keys) do |sym, value|
       self.instance_variable_set("@#{sym}", value)
     end
@@ -410,12 +413,19 @@ module EtcdModel
     end
   end
 
+  # Get etcd index when this node was created or last modified
+  def etcd_index
+    @etcd_node.modified_index
+  end
+
   # Load object from etcd node
   #
   # Updates all JSON attribute values.
   #
   # @raise [Invalid]
   def load!(node)
+    @etcd_node = node
+
     if node.directory?
        raise self.class.const_get(:Invalid), "Node is a directory"
      end
@@ -425,33 +435,42 @@ module EtcdModel
     raise self.class.const_get(:Invalid), "Invalid JSON value: #{error}"
   end
 
+  # Test if this node has been modified after the given index
+  def etcd_modified?(after_index: nil)
+    if after_index && @etcd_node.modified_index > after_index
+      return true
+    end
+    return false
+  end
+
   # Get this objcet from etcd.
   #
   # Updates all JSON attribute values.
   #
   # @raise Etcd::KeyNotFound
   def get!
-    load!(etcd.get(etcd_key))
+    load!(etcd.get(etcd_key).node)
   end
 
   # Create this object in etcd, raising if the object already exists.
   #
   # @raise Etcd::NodeExist
   def create!
-    etcd.set(etcd_key, value: to_json, prevExist: false)
+    @etcd_node = etcd.set(etcd_key, value: to_json, prevExist: false).node
   end
 
   # Update this object in etcd, raising if the object does not exist.
   #
   # @raise ...
   def update!
-    etcd.set(etcd_key, value: to_json, prevExist: true)
+    @etcd_node = etcd.set(etcd_key, value: to_json, prevExist: true).node
   end
 
   # Delete this object in etcd, raising if the object does not exist.
   #
   # @raise ...
   def delete!
-    etcd.delete(etcd_key)
+    # delete changes the node.modified_index
+    @etcd_node = etcd.delete(etcd_key).node
   end
 end
