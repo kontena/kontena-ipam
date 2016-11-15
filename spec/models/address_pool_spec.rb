@@ -48,14 +48,24 @@ describe AddressPool do
     it 'loads existing object from etcd', :etcd => true do
       etcd_server.load!(
         '/kontena/ipam/subnets/10.80.0.0' => {"address" => "10.80.0.0/16"},
-        '/kontena/ipam/subnets/10.81.0.0' => {"address" => "10.81.0.0/16"},
-        '/kontena/ipam/pools/kontena' => {"subnet" => "10.80.0.0/16", "gateway" => "10.80.0.1/16"}
+        '/kontena/ipam/pools/kontena' => {"subnet" => "10.80.0.0/16", "gateway" => "10.80.0.1/16"},
+        '/kontena/ipam/addresses/kontena/10.80.0.1' => {"address" => "10.80.0.1/16"},
       )
 
       # yes, it returns with a different subnet
       expect(described_class.create_or_get('kontena', subnet: IPAddr.new("10.81.0.0/16"))).to eq AddressPool.new('kontena', subnet: IPAddr.new("10.80.0.0/16"), gateway: IPAddr.new('10.80.0.1/16'))
 
-      expect(etcd_server).to_not be_modified
+      # TODO: the requested subnet gets leaked
+      expect(etcd_server).to be_modified
+      expect(etcd_server.logs).to eq [
+        [:create, '/kontena/ipam/subnets/10.81.0.0'],
+      ]
+      expect(etcd_server.nodes).to eq(
+        '/kontena/ipam/subnets/10.80.0.0' => {"address" => "10.80.0.0/16"},
+        '/kontena/ipam/subnets/10.81.0.0' => {"address" => "10.81.0.0/16"},
+        '/kontena/ipam/pools/kontena' => {"subnet" => "10.80.0.0/16", "gateway" => "10.80.0.1/16"},
+        '/kontena/ipam/addresses/kontena/10.80.0.1' => {"address" => "10.80.0.1/16"},
+      )
     end
   end
 
