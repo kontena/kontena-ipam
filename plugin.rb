@@ -103,7 +103,7 @@ class IpamPlugin < Sinatra::Application
 
     json(
       'Address' => address.address.to_cidr,
-      'Data'    => {},
+      'Data'    => {}, # Hash<String, String>; ignored by Docker
     )
   end
 
@@ -119,6 +119,24 @@ class IpamPlugin < Sinatra::Application
   post '/IpamDriver.ReleasePool' do
     AddressPools::Release.run!(
       pool_id: params['PoolID']
+    )
+
+    json({})
+  end
+
+  get '/KontenaIPAM.Cleanup' do
+    params = Addresses::Cleanup.prep
+
+    json({
+      'EtcdIndex' => params[:etcd_index],
+    })
+  end
+
+  post '/KontenaIPAM.Cleanup' do
+    Addresses::Cleanup.run!(
+      etcd_index_upto: params['EtcdIndex'],
+      pool_id: params['PoolID'],
+      addresses: params['Addresses'],
     )
 
     json({})

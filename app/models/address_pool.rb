@@ -65,10 +65,14 @@ class AddressPool
   # * A PoolNode.rmdir
   # * B AddressPool.request!
   # * A AddressPool.delete!
+  #
+  # @return [Boolean] pool was deleted as no longer in use
   def cleanup
     delete!
+    return true
   rescue PoolNode::Conflict
     # still in use
+    return false
   end
 
   # Delete Address directory and release Subnet for this pool

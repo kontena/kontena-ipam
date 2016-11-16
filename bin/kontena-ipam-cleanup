@@ -11,8 +11,5 @@ Logging.initialize_logger(STDERR, log_level)
 
 EtcdModel.etcd = EtcdClient.new(ENV)
 
-# TODO: Addresses::Cleanup
-cleaner = AddressCleanup.new
-cleaner.cleanup
 
-AddressPools::Cleanup.run!
+Commands::Cleanup.parse(ARGV).execute
