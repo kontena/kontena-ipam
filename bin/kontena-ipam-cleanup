@@ -13,6 +13,6 @@ EtcdModel.etcd = EtcdClient.new(ENV)
 
 # TODO: Addresses::Cleanup
 cleaner = AddressCleanup.new
-cleaner.cleanup
+cleaner.cleanup_known_addresses(ARGV)
 
 AddressPools::Cleanup.run!

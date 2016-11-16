@@ -5,7 +5,8 @@ describe AddressCleanup do
   include Rack::Test::Methods
 
   let(:subject) do
-    described_class.new('1')
+    expect_any_instance_of(NodeHelper).to receive(:node).and_return('1')
+    described_class.new
   end
 
   describe '#initialize' do
@@ -17,7 +18,7 @@ describe AddressCleanup do
     end
   end
 
-  describe '#local_addresses' do
+  describe '#local_docker_known_addresses' do
     it 'collects all docker address' do
       expect(Docker::Network).to receive(:all).and_return(
         [
@@ -38,11 +39,11 @@ describe AddressCleanup do
         ]
       )
 
-      known_addresses = subject.local_addresses
+      known_addresses = subject.send(:local_docker_known_addresses)
       expect(known_addresses.size).to eq 1
     end
   end
-
+  
   describe '#cleanup', :etcd => true do
 
     before do
@@ -57,9 +58,7 @@ describe AddressCleanup do
     end
 
     it 'removes only unused addresses' do
-      expect(subject).to receive(:local_addresses).and_return([IPAddr.new('10.80.1.111/24').to_host])
-
-      subject.cleanup
+      subject.send(:cleanup, [IPAddr.new('10.80.1.111/24').to_host])
 
       expect(etcd_server.nodes).to eq({
         '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
@@ -70,4 +69,5 @@ describe AddressCleanup do
       })
     end
   end
+
 end
