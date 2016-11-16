@@ -48,13 +48,13 @@ module Commands
     end
 
     def execute
-      etcd_index = EtcdModel.etcd.get_index
+      prep = Addresses::Cleanup.prep
 
       if self.quiesce_sleep
-        info "Cleanup upto etcd-index=#{etcd_index} after quiesce delay of #{self.quiesce_sleep} seconds..."
+        info "Cleanup upto etcd-index=#{prep[:etcd_index]} after quiesce delay of #{self.quiesce_sleep} seconds..."
         sleep self.quiesce_sleep
       else
-        info "Cleanup upto etcd-index=#{etcd_index} without any quiesce delay"
+        info "Cleanup upto etcd-index=#{prep[:etcd_index]} without any quiesce delay"
       end
 
       info "Cleanup addresses from Docker..."
@@ -62,10 +62,9 @@ module Commands
         info "Cleanup Kontena IPAM pool #{pool} with #{addresses.length} local Docker addresses"
 
         Addresses::Cleanup.run!(
+          etcd_index_upto: prep[:etcd_index],
           pool_id: pool,
           addresses: addresses,
-
-          etcd_index_upto: etcd_index,
         )
       end
     end

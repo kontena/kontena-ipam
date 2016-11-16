@@ -13,14 +13,11 @@ module Addresses
     end
 
     required do
+      integer :etcd_index_upto
       string :pool_id
       array :addresses do
         ipaddr
       end
-    end
-
-    optional do
-      integer :etcd_index_upto
     end
 
     def validate
@@ -55,7 +52,7 @@ module Addresses
         elsif @ipset.include?(address.address.to_host)
           debug "..still in use, skipping"
 
-        elsif self.etcd_index_upto && address.etcd_modified?(after_index: self.etcd_index_upto)
+        elsif address.etcd_modified?(after_index: self.etcd_index_upto)
           debug "...recently allocated, skipping"
 
         else

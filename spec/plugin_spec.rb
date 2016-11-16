@@ -503,6 +503,7 @@ describe IpamPlugin do
   describe 'POST /KontenaIPAM.Cleanup' do
     it "Errors for a missing addresses parameter" do
       data = api_post '/KontenaIPAM.Cleanup', {
+        'EtcdIndex' => 0,
         'PoolID'    => 'test1',
         'Addreses'  => [ '127.0.0.1' ],
       }
@@ -526,7 +527,9 @@ describe IpamPlugin do
       end
 
       it "Removes all addresses owned by this node" do
+        data = api_get '/KontenaIPAM.Cleanup'
         data = api_post '/KontenaIPAM.Cleanup', {
+          'EtcdIndex' => data['EtcdIndex'],
           'PoolID'    => 'test1',
           'Addresses' => [],
         }
@@ -548,7 +551,9 @@ describe IpamPlugin do
       end
 
       it "Only removes unused addresses owned by this node" do
+        data = api_get '/KontenaIPAM.Cleanup'
         data = api_post '/KontenaIPAM.Cleanup', {
+          'EtcdIndex' => data['EtcdIndex'],
           'PoolID' => 'test1',
           'Addresses' => [
             '10.80.1.111/24'
