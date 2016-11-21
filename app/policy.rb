@@ -48,10 +48,8 @@ class Policy
   def allocate_address(addresses)
     if addresses.empty?
       nil
-    elsif addresses.size > 100
-      addresses[rand(0..100)]
     else
-      addresses[0]
+      addresses[rand(0...addresses.size)]
     end
   end
 end
