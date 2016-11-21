@@ -8,6 +8,8 @@
 # @attr_reader [IPAddr] supernet CIDR range for allocating subnets
 # @attr_reader [Integer] subnet_length desired subnet length
 class Policy
+  include Logging
+
   # Allocate subnets from within this network
   SUPERNET = IPAddr.new('10.80.0.0/12')
 
@@ -43,13 +45,19 @@ class Policy
   # Allocate an IP address from within the given set of available addresses.
   # Returns nil if no available addresses
   #
-  # @param addresses [Array<IPAddr>] available host addresses
+  # @param pol [AddressPool] pool to allocate from
   # @return [IPAddr] or nil
-  def allocate_address(addresses)
-    if addresses.empty?
-      nil
+  def allocate_address(pool)
+    available = pool.available_addresses.first(100).to_a
+
+    if available.empty?
+      warn "Address pool=#{pool.id} allocates range=#{pool.allocation_range} with no available addresses"
+
+      return nil
     else
-      addresses[rand(0...addresses.size)]
+      info "Address pool=#{pool.id} allocates from range=#{pool.allocation_range} with available=#{available.size}#{available.size >= 100 ? '+' : ''} addresses"
+
+      return available[rand(0...available.size)]
     end
   end
 end
