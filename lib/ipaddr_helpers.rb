@@ -182,6 +182,14 @@ class IPAddr
       @addr & _hostmask
     end
 
+    # Return address within subnet.
+    #
+    def [](i)
+      raise ArgumentError, "IP #{i} outside of subnet #{inspect}" if i > _hostmask
+
+      self | i
+    end
+
     # Enumerate the subnet addresses within this network.
     #
     # Optionally skip the first offset addresses.
