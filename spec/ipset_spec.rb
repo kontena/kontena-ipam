@@ -1,6 +1,32 @@
 require_relative '../lib/ipset'
 
 describe IPSet do
+  it 'includes an added address' do
+    subject = described_class.new([])
+    subject.add! IPAddr.new('192.0.2.1')
+
+    expect(subject.length).to eq 1
+    expect(subject).to include IPAddr.new('192.0.2.1')
+  end
+
+  it 'also includes an added address' do
+    subject = described_class.new([IPAddr.new('192.0.2.1')])
+    subject.add! IPAddr.new('192.0.2.2')
+
+    expect(subject.length).to eq 2
+    expect(subject).to include IPAddr.new('192.0.2.1')
+    expect(subject).to include IPAddr.new('192.0.2.2')
+  end
+
+  it 'also includes an added address in reverse order' do
+    subject = described_class.new([IPAddr.new('192.0.2.2')])
+    subject.add! IPAddr.new('192.0.2.1')
+
+    expect(subject.length).to eq 2
+    expect(subject).to include IPAddr.new('192.0.2.1')
+    expect(subject).to include IPAddr.new('192.0.2.2')
+  end
+
   context 'for a full subnet' do
     let :subject do
       described_class.new((1..254).map { |i| IPAddr.new("192.0.2.#{i}")})

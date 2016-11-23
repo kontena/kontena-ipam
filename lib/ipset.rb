@@ -15,6 +15,11 @@ class IPSet
     @addrs.length
   end
 
+  def add!(addr)
+    @addrs.push(addr)
+    @addrs.sort!
+  end
+
   # Search for addrs contained within the given networks, or networks containing the given addr
   def search(addr)
     @addrs.each do |a|
