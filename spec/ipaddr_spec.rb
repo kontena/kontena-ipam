@@ -120,6 +120,21 @@ describe IPAddr do
       expect(subject.broadcast).to be_broadcast
     end
 
+    describe '#[]' do
+      it 'returns the correct IP' do
+        expect(subject[0].to_s).to eq '192.0.2.0'
+        expect(subject[1].to_s).to eq '192.0.2.1'
+        expect(subject[2].to_s).to eq '192.0.2.2'
+        expect(subject[254].to_s).to eq '192.0.2.254'
+        expect(subject[255].to_s).to eq '192.0.2.255'
+      end
+
+      it 'raises on invalid offset' do
+        expect{subject[256]}.to raise_error(ArgumentError)
+        expect{subject[256 + 1]}.to raise_error(ArgumentError)
+      end
+    end
+
     it 'lists the host addresses' do
       hosts = subject.hosts
 

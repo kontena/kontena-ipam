@@ -63,17 +63,13 @@ module Addresses
     # @raise AddressPool::Full
     # @return [Address] reserved address
     def request_dynamic
-      available = @pool.available_addresses.first(100).to_a
-
-      info "Allocate dynamic address in pool=#{@pool.id} from range=#{@pool.allocation_range} with available=#{available.size}#{available.size >= 100 ? '+' : ''} addresses"
-
       # allocate
-      unless allocate_address = policy.allocate_address(available)
+      unless ipaddr = policy.allocate_address(@pool)
         raise AddressPool::Full, "No addresses available for allocation in pool #{@pool}"
       end
 
       # reserve
-      return @pool.create_address(allocate_address)
+      return @pool.create_address(ipaddr)
     end
   end
 end

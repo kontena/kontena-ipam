@@ -11,8 +11,19 @@ class IPSet
     @addrs = addrs.sort
   end
 
+  # Number of addresses in set
+  #
+  # @return [Integer]
   def length
     @addrs.length
+  end
+
+  # Add new address to set
+  #
+  # @param addr [IPAddr]
+  def add!(addr)
+    @addrs.push(addr)
+    @addrs.sort!
   end
 
   # Search for addrs contained within the given networks, or networks containing the given addr
