@@ -33,4 +33,4 @@ deploy:
     on:
       tags: true
       rvm: 2.3.1
-      repo: kontena/kontena-docker-ipam-plugin
+      repo: kontena/kontena-ipam
