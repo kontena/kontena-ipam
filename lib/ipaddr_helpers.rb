@@ -184,6 +184,9 @@ class IPAddr
 
     # Return address within subnet.
     #
+    # @param i [Integer] offset within subnet
+    # @raise ArgumentError address outside of subnet
+    # @return [IPAddr] address with host bits set and subnet mask
     def [](i)
       raise ArgumentError, "IP #{i} outside of subnet #{inspect}" if i > _hostmask
 

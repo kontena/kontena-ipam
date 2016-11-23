@@ -45,7 +45,7 @@ class Policy
   # Allocate an IP address from within the given set of available addresses.
   # Returns nil if no available addresses
   #
-  # @param pol [AddressPool] pool to allocate from
+  # @param pool [AddressPool] pool to allocate from
   # @return [IPAddr] or nil
   def allocate_address(pool)
     available = pool.available_addresses.first(100).to_a
