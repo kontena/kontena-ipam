@@ -70,7 +70,54 @@ describe Policy do
       end
     end
 
+    context "Using the 10.81.0.0/16 pool" do
+      let :pool do
+        instance_double(AddressPool, id: 'kontena',
+          subnet: IPAddr.new('10.81.0.0/16'),
+          iprange: IPAddr.new('10.81.128.0/17'),
+          gateway: IPAddr.new('10.81.0.1'),
 
+          allocation_range: IPAddr.new('10.81.128.0/17').to_range,
+        )
+      end
+
+      describe '#allocate_address' do
+        it 'returns nil if exhausted' do
+          expect(pool).to receive(:available_addresses)
+            .and_return(pool.subnet.hosts(range: pool.iprange.to_range, exclude: IPSet.new([pool.iprange])))
+
+          expect(subject.allocate_address(pool)).to be_nil
+        end
+
+        it 'allocates a valid address within the first 100 addresses' do
+          expect(pool).to receive(:available_addresses)
+            .and_return(pool.subnet.hosts(range: pool.iprange.to_range, exclude: IPSet.new([pool.gateway])))
+
+          ipaddr = subject.allocate_address(pool)
+
+          expect(ipaddr).to_not be_nil
+          expect(ipaddr).to be > IPAddr.new('10.81.0.1')
+          expect(ipaddr).to be >= IPAddr.new('10.81.128.0')
+          expect(ipaddr).to be < IPAddr.new('10.81.128.100')
+        end
+
+        it 'allocates different addresses' do
+          exclude = IPSet.new([pool.gateway])
+          addrs = []
+
+          for i in (1..150) do
+            expect(pool).to receive(:available_addresses).once
+              .and_return(pool.subnet.hosts(range: pool.iprange.to_range, exclude: exclude))
+
+            addr = subject.allocate_address(pool)
+            expect(addr).to_not be_nil, exclude.inspect
+            expect(addrs).to_not include(addr.to_s)
+
+            exclude.add! addr.to_host
+            addrs.push addr.to_s
+          end
+        end
+      end
     end
   end
 end
