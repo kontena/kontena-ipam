@@ -57,7 +57,7 @@ class Policy
     else
       info "Address pool=#{pool.id} allocates from range=#{pool.allocation_range} with available=#{available.size}#{available.size >= 100 ? '+' : ''} addresses"
 
-      return available[rand(0...available.size)]
+      return available.sample
     end
   end
 end
