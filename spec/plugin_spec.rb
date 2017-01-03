@@ -28,24 +28,18 @@ describe IpamPlugin do
     end
 
     expect(last_response.status).to eq(expect_status), last_response.errors
+    expect(last_response.content_type).to eq 'application/json'
 
-    if last_response.content_type == 'application/json'
-      JSON.parse(last_response.body)
-    else
-      last_response.body
-    end
+    JSON.load(last_response.body)
   end
 
   def api_get(url, expect_status: 200)
     get url
 
     expect(last_response.status).to eq(expect_status), last_response.errors
+    expect(last_response.content_type).to eq 'application/json'
 
-    if last_response.content_type == 'application/json'
-      JSON.parse(last_response.body)
-    else
-      last_response.body
-    end
+    JSON.load(last_response.body)
   end
 
   describe '/Plugin.Activate', :etcd => true do
@@ -74,9 +68,17 @@ describe IpamPlugin do
 
   describe '/IpamDriver.RequestPool' do
     it 'returns 400 on invalid JSON' do
-      data = api_post '/Plugin.Activate', 'invalid', expect_status: 400
+      post '/Plugin.Activate', 'invalid'
 
-      expect(data).to match(/^JSON parse error: \d*: unexpected token at '\"invalid\"'$/)
+      expect(last_response.status).to eq(400)
+      expect(last_response.body).to match(/^Invalid request body JSON::ParserError: \d+: unexpected token at 'invalid'$/)
+    end
+
+    it 'returns 400 on invalid data' do
+      post '/Plugin.Activate', 'true'
+
+      expect(last_response.status).to eq(400)
+      expect(last_response.body).to match(/^Invalid request body JSON::ParserError: \d+: unexpected token at 'true'$/)
     end
 
     it 'returns 400 on missing network option' do
