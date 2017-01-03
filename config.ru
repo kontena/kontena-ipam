@@ -1,3 +1,7 @@
+require 'kontena/etcd'
+
+Kontena::Etcd::Model.etcd = Kontena::Etcd::Client.from_env
+
 require_relative 'plugin.rb'
 require_relative 'app/logging.rb'
 

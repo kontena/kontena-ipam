@@ -4,6 +4,7 @@ require 'json'
 require 'mutations'
 require 'logger'
 require 'ipaddr'
+require 'kontena/etcd'
 
 require_relative '../lib/ipset'
 require_relative '../lib/ipaddr_helpers'

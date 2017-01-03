@@ -52,6 +52,7 @@ describe IpamPlugin do
 
       expect(etcd_server).to be_modified
       expect(etcd_server.list).to eq [
+        '/kontena/',
         '/kontena/ipam/',
         '/kontena/ipam/addresses/',
         '/kontena/ipam/pools/',

@@ -8,7 +8,7 @@ module Addresses
     # @return [Hash] { etcd_index: Integer }
     def self.prep
       return {
-        etcd_index: EtcdModel.etcd.get_index,
+        etcd_index: Kontena::Etcd::Model.etcd.get_index,
       }
     end
 
