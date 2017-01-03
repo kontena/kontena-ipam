@@ -1,0 +1,3 @@
+[submodule "kontena-etcd"]
+	path = vendor/kontena/kontena-etcd
+	url = https://github.com/SpComb/kontena-etcd.git

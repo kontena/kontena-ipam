@@ -1,4 +1,4 @@
-.bundle/
-vendor/
-.git/
+.*
+vendor/bundle
+vendor/kontena/*/vendor
 coverage/

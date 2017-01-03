@@ -6,6 +6,8 @@ gem 'mutations'
 gem 'thin', require: false
 gem 'docker-api'
 
+gem 'kontena-etcd', path: 'vendor/kontena/kontena-etcd'
+
 group :development, :test do
   gem 'rake', require: false
   gem 'rspec', require: false
