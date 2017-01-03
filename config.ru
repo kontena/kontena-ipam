@@ -8,8 +8,6 @@ else
 end
 Logging.initialize_logger(STDOUT, log_level)
 
-EtcdModel.etcd = EtcdClient.new(ENV)
-
 IpamPlugin.policy = Policy.new(ENV)
 
 

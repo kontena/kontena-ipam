@@ -2,7 +2,6 @@ source 'https://rubygems.org'
 
 gem 'sinatra'
 gem 'sinatra-contrib'
-gem 'etcd'
 gem 'mutations'
 gem 'thin', require: false
 gem 'docker-api'
