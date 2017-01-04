@@ -484,7 +484,7 @@ describe IpamPlugin do
     it "Returns the current etcd index", :etcd => true do
       data = api_get '/KontenaIPAM.Cleanup'
 
-      expect(data).to eq({ 'EtcdIndex' => etcd_server.etcd_index })
+      expect(data).to eq({ 'EtcdIndex' => etcd_server.start_index })
     end
   end
 
