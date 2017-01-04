@@ -78,7 +78,9 @@ describe IpamPlugin do
       post '/Plugin.Activate', 'true'
 
       expect(last_response.status).to eq(400)
-      expect(last_response.body).to match(/^Invalid request body JSON::ParserError: \d+: unexpected token at 'true'$/)
+
+      # this behaves differently on ruby json 1.8.3 vs 2.0.2
+      expect(last_response.body).to match(/^Invalid request body (JSON::ParserError: \d+: unexpected token at 'true'|TypeError: no implicit conversion of true into Hash)$/)
     end
 
     it 'returns 400 on missing network option' do
