@@ -538,10 +538,10 @@ describe IpamPlugin do
         expect(data).to eq({ })
 
         expect(etcd_server).to be_modified
-        expect(etcd_server.logs).to eq [
+        expect(etcd_server.logs).to contain_exactly( # ordering is undefined
           [:delete, '/kontena/ipam/addresses/test1/10.80.1.100'],
           [:delete, '/kontena/ipam/addresses/test1/10.80.1.111'],
-        ]
+        )
         expect(etcd_server.nodes).to eq({
           '/kontena/ipam/subnets/10.80.1.0' => { 'address' => '10.80.1.0/24' },
           '/kontena/ipam/pools/test1' => { 'subnet' => '10.80.1.0/24', 'gateway' => '10.80.1.1/24' },
