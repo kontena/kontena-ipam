@@ -20,7 +20,9 @@ describe IpamPlugin do
     subject
   end
 
-  def api_post(url, params = {}, expect_status: 200)
+  # @param url [String]
+  # @param params [Hash, nil] request body JSON object
+  def api_post(url, params, expect_status: 200)
     if params.nil?
       post url
     else
