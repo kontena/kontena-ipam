@@ -17,9 +17,6 @@ class EtcdClient < Etcd::Client
       port: @uri.port.to_i || PORT,
       use_ssl: @uri.scheme == 'https',
     )
-
-    # test, raises if bad endpoint
-    info "Connected to #{uri} version #{version} "
   end
 
   # Query and parse the etcd daemon version

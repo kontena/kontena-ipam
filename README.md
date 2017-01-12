@@ -10,13 +10,24 @@ See the [Design doc](/docs/design.md) for further details.
 
 ## Build
 
-    docker build -t kontena-ipam .
+    docker build -t kontena/ipam-plugin .
 
-## Usage
+## Usage (Docker)
 
-Run the plugin:
+Run the plugin using Docker:
 
-    docker run --rm --name kontena-ipam --net host -v /run/docker/plugins:/run/docker/plugins kontena-ipam
+    docker run --rm --name kontena-ipam --net host -v /run/docker/plugins:/run/docker/plugins kontena/ipam-plugin
+
+## Usage (Systemd)
+
+Run the plugin using systemd-nspawn:
+
+    mkdir -p /opt/kontena
+    ln -s $PWD/kontena-ipam.env $PWD/kontena-ipam.env /etc
+    ln -s $PWD/kontena-ipam.sh /opt/kontena
+    systemctl link $(pwd)/kontena-ipam.socket
+    systemctl link $(pwd)/kontena-ipam.service
+    systemctl enable kontena-ipam.service kontena-ipam.socket
 
 ### Configuration
 

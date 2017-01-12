@@ -1,0 +1,19 @@
+[Unit]
+Description=Kontena IPAM plugin for Docker
+Requires=kontena-ipam.socket
+PartOf=machines.target
+Before=machines.target
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/kontena-ipam.env
+Type=notify
+ExecStart=/opt/kontena/kontena-ipam.sh
+KillMode=mixed
+RestartForceExitStatus=133
+SuccessExitStatus=133
+Slice=machine.slice
+Delegate=yes
+
+[Install]
+WantedBy=machines.target

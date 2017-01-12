@@ -28,6 +28,7 @@ GEM
     multi_json (1.12.1)
     mutations (0.7.2)
       activesupport
+    puma (3.6.0)
     rack (1.6.4)
     rack-protection (1.5.3)
       rack
@@ -83,6 +84,7 @@ DEPENDENCIES
   docker-api
   etcd
   mutations
+  puma
   rack-test
   rake
   rspec
@@ -93,4 +95,4 @@ DEPENDENCIES
   webmock
 
 BUNDLED WITH
-   1.12.5
+   1.13.5
