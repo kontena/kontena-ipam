@@ -127,7 +127,7 @@ class AddressPool
 
   # Compute available addresses for allocation within pool
   #
-  # @return [Enumerator<IPAddr>]
+  # @return [Enumerator<IPAddr>] with subnet mask
   def available_addresses
     @subnet.hosts(range: allocation_range, exclude: reserved_addresses)
   end

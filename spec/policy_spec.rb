@@ -96,9 +96,10 @@ describe Policy do
           ipaddr = subject.allocate_address(pool)
 
           expect(ipaddr).to_not be_nil
-          expect(ipaddr).to be > IPAddr.new('10.81.0.1')
-          expect(ipaddr).to be >= IPAddr.new('10.81.128.0')
-          expect(ipaddr).to be < IPAddr.new('10.81.128.100')
+          expect(ipaddr.length).to eq 16
+          expect(ipaddr).to be > IPAddr.new('10.81.0.1/16')
+          expect(ipaddr).to be >= IPAddr.new('10.81.128.0/16')
+          expect(ipaddr).to be < IPAddr.new('10.81.128.100/16')
         end
 
         it 'allocates different addresses' do

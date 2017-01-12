@@ -54,8 +54,8 @@ class IpamPlugin < Sinatra::Application
 
     begin
       params.merge! JSON.parse(body)
-    rescue JSON::JSONError => error
-      halt 400, "JSON parse error: #{error.message}"
+    rescue => error
+      halt 400, "Invalid request body #{error.class}: #{error.message}"
     end
   end
 

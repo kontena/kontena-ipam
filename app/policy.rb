@@ -46,7 +46,7 @@ class Policy
   # Returns nil if no available addresses
   #
   # @param pool [AddressPool] pool to allocate from
-  # @return [IPAddr] or nil
+  # @return [IPAddr, nil] with subnet mask
   def allocate_address(pool)
     available = pool.available_addresses.first(100).to_a
 
