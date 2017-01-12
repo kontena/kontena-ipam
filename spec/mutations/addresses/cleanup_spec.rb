@@ -18,7 +18,7 @@ describe Addresses::Cleanup do
     context "With a single address string for the pool" do
       subject do
         described_class.new(
-          etcd_index_upto: etcd_server.etcd_index,
+          etcd_index_upto: etcd_server.start_index,
           pool_id: 'test1',
           addresses: [
             '10.80.1.111/24',
@@ -38,7 +38,7 @@ describe Addresses::Cleanup do
     context "With a single address for the pool" do
       subject do
         described_class.new(
-          etcd_index_upto: etcd_server.etcd_index,
+          etcd_index_upto: etcd_server.start_index,
           pool_id: 'test1',
           addresses: [
             IPAddr.new('10.80.1.111/24').to_host,

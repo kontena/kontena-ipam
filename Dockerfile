@@ -11,8 +11,8 @@ ENV RUBY_GC_HEAP_GROWTH_FACTOR=1.1 \
 RUN apk update && apk --update add ruby ruby-irb ruby-bigdecimal \
     ruby-io-console ruby-json ca-certificates libssl1.0 openssl libstdc++
 
-ADD Gemfile /app/
-ADD Gemfile.lock /app/
+ADD Gemfile Gemfile.lock /app/
+ADD vendor/kontena/kontena-etcd/Gemfile /app/vendor/kontena/kontena-etcd/
 
 RUN apk --update add --virtual build-dependencies ruby-dev build-base openssl-dev && \
     gem install bundler --no-ri --no-rdoc && \

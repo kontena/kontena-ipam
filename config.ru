@@ -1,3 +1,7 @@
+require 'kontena/etcd'
+
+Kontena::Etcd::Model.etcd = Kontena::Etcd::Client.from_env
+
 require_relative 'plugin.rb'
 require_relative 'app/logging.rb'
 
@@ -7,8 +11,6 @@ else
   log_level = Logger::INFO
 end
 Logging.initialize_logger(STDOUT, log_level)
-
-EtcdModel.etcd = EtcdClient.new(ENV)
 
 IpamPlugin.policy = Policy.new(ENV)
 

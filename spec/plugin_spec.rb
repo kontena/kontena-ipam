@@ -52,6 +52,7 @@ describe IpamPlugin do
 
       expect(etcd_server).to be_modified
       expect(etcd_server.list).to eq [
+        '/kontena/',
         '/kontena/ipam/',
         '/kontena/ipam/addresses/',
         '/kontena/ipam/pools/',
@@ -483,7 +484,7 @@ describe IpamPlugin do
     it "Returns the current etcd index", :etcd => true do
       data = api_get '/KontenaIPAM.Cleanup'
 
-      expect(data).to eq({ 'EtcdIndex' => etcd_server.etcd_index })
+      expect(data).to eq({ 'EtcdIndex' => etcd_server.start_index })
     end
   end
 

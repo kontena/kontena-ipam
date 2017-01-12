@@ -1,11 +1,9 @@
 class Subnet
-  include JSONModel
-  include EtcdModel
+  include Kontena::JSON::Model
+  include Kontena::Etcd::Model
 
   etcd_path '/kontena/ipam/subnets/:id'
   json_attr :address, type: IPAddr
-
-  attr_accessor :id, :address
 
   # Returns currently allocated subnets.
   #

@@ -1,5 +1,9 @@
 #!/usr/bin/env ruby
 
+require 'kontena/etcd'
+
+Kontena::Etcd::Model.etcd = Kontena::Etcd::Client.from_env
+
 require_relative '../app/boot'
 
 if ENV['LOG_LEVEL']
@@ -8,8 +12,5 @@ else
   log_level = Logger::INFO
 end
 Logging.initialize_logger(STDERR, log_level)
-
-EtcdModel.etcd = EtcdClient.new(ENV)
-
 
 Commands::Cleanup.parse(ARGV).execute

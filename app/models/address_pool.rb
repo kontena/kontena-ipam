@@ -1,6 +1,6 @@
 class AddressPool
-  include JSONModel
-  include EtcdModel
+  include Kontena::JSON::Model
+  include Kontena::Etcd::Model
   include NodeHelper
 
   # Address pool is full
@@ -12,8 +12,6 @@ class AddressPool
   json_attr :subnet, type: IPAddr
   json_attr :iprange, type: IPAddr, omitnil: true
   json_attr :gateway, type: IPAddr
-
-  attr_accessor :id, :subnet, :iprange, :gateway
 
   # Return currently reserved subnets
   #
