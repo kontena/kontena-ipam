@@ -1,4 +1,5 @@
 require 'ipaddr'
+require 'net/ping/icmp'
 
 module Addresses
   class Release < Mutations::Command
@@ -31,13 +32,18 @@ module Addresses
         info "Skip gateway address=#{address.id} in pool=#{@pool.id}"
 
       else
-        if address.address.ping?
+        if ping?(address.address)
           info "#{self.address} still responds to ping, deleting omitted"
         else
           info "Delete address=#{address.id} in pool=#{@pool.id}"
           address.delete!
         end
       end
+    end
+
+    def ping?(ip_address)
+      icmp = Net::Ping::ICMP.new(ip_address.to_s)
+      icmp.ping?
     end
   end
 end

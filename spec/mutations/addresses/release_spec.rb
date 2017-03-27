@@ -1,6 +1,8 @@
 describe Addresses::Release do
+
   before do
-    allow_any_instance_of(IPAddr).to receive(:ping?).and_return(false)
+    # Default mock
+    allow_any_instance_of(described_class).to receive(:ping?).and_return(false)
   end
 
   describe '#validate' do
@@ -107,7 +109,7 @@ describe Addresses::Release do
 
       it 'does not delete address which still responds to ping' do
         expect(pool).to receive(:get_address).with(IPAddr.new('10.80.0.2')).and_return(address)
-        expect(address.address).to receive(:ping?).and_return(true)
+        expect(subject).to receive(:ping?).with(IPAddr.new('10.80.0.2')).and_return(true)
         expect(address).not_to receive(:delete!)
 
         outcome = subject.run
