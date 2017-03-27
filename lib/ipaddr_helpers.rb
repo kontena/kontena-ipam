@@ -1,4 +1,5 @@
 require 'ipaddr'
+require 'net/ping'
 
 # monkey-patch
 class IPAddr
@@ -243,5 +244,10 @@ class IPAddr
           y << mask(super_length)
         end
       end
+    end
+
+    def ping?
+      icmp = Net::Ping::ICMP.new(self.to_s)
+      icmp.ping?
     end
 end

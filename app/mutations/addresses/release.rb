@@ -31,9 +31,12 @@ module Addresses
         info "Skip gateway address=#{address.id} in pool=#{@pool.id}"
 
       else
-        info "Delete address=#{address.id} in pool=#{@pool.id}"
-
-        address.delete!
+        if address.address.ping?
+          info "#{self.address} still responds to ping, deleting omitted"
+        else
+          info "Delete address=#{address.id} in pool=#{@pool.id}"
+          address.delete!
+        end
       end
     end
   end

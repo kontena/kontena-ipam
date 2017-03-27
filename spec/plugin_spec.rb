@@ -14,6 +14,7 @@ describe IpamPlugin do
     IpamPlugin.policy = policy
 
     allow_any_instance_of(NodeHelper).to receive(:node).and_return('somehost')
+    allow_any_instance_of(IPAddr).to receive(:ping?).and_return(false)
   end
 
   let :app do

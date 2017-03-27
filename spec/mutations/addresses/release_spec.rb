@@ -1,4 +1,8 @@
 describe Addresses::Release do
+  before do
+    allow_any_instance_of(IPAddr).to receive(:ping?).and_return(false)
+  end
+
   describe '#validate' do
     it 'rejects a missing pool_id' do
       subject = described_class.new()
@@ -96,6 +100,16 @@ describe Addresses::Release do
         expect(gateway).not_to receive(:delete!)
 
         subject = described_class.new(pool_id: 'kontena', address: '10.80.0.1')
+        outcome = subject.run
+
+        expect(outcome).to be_success
+      end
+
+      it 'does not delete address which still responds to ping' do
+        expect(pool).to receive(:get_address).with(IPAddr.new('10.80.0.2')).and_return(address)
+        expect(address.address).to receive(:ping?).and_return(true)
+        expect(address).not_to receive(:delete!)
+
         outcome = subject.run
 
         expect(outcome).to be_success
