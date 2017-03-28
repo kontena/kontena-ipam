@@ -1,11 +1,11 @@
 describe Addresses::Release do
 
-  before do
-    # Default mock
-    allow_any_instance_of(described_class).to receive(:ping?).and_return(false)
-  end
-
   describe '#validate' do
+    before do
+      # Default mock
+      allow_any_instance_of(described_class).to receive(:ping?).and_return(false)
+    end
+
     it 'rejects a missing pool_id' do
       subject = described_class.new()
 
@@ -67,6 +67,10 @@ describe Addresses::Release do
   end
 
   describe '#execute' do
+    before do
+      # Default mock
+      allow_any_instance_of(described_class).to receive(:ping?).and_return(false)
+    end
     context 'releasing a pool address' do
       let :pool do
         AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16'), gateway: IPAddr.new('10.80.0.1/16'))
@@ -117,6 +121,40 @@ describe Addresses::Release do
         expect(outcome.success?).to be_falsey
         expect(outcome.errors['address'].symbolic).to eq(:zombie)
       end
+    end
+  end
+
+  describe '#ping?' do
+    let :subject do
+      described_class.new(pool_id: 'kontena', address: '10.80.0.2')
+    end
+    let :pool do
+      AddressPool.new('kontena', subnet: IPAddr.new('10.80.0.0/16'), gateway: IPAddr.new('10.80.0.1/16'))
+    end
+
+    let :address do
+      Address.new('kontena', '10.80.0.2', address: pool.subnet.subnet_addr('10.80.0.2'))
+    end
+    before do
+      expect(AddressPool).to receive(:get).with('kontena').and_return(pool)
+    end
+
+    it 'pings with default timeout' do
+      ping = double
+      expect(Net::Ping::ICMP).to receive(:new).with('8.8.8.8', 0, 1).and_return(ping)
+      expect(ping).to receive(:ping?)
+
+      ip = IPAddr.new('8.8.8.8')
+      subject.ping?(ip)
+    end
+
+    it 'pings with default timeout' do
+      ping = double
+      expect(Net::Ping::ICMP).to receive(:new).with('8.8.8.8', 0, 5).and_return(ping)
+      expect(ping).to receive(:ping?)
+
+      ip = IPAddr.new('8.8.8.8')
+      subject.ping?(ip, timeout: 5)
     end
   end
 end
