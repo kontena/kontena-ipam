@@ -114,7 +114,8 @@ describe Addresses::Release do
 
         outcome = subject.run
 
-        expect(outcome).to be_success
+        expect(outcome.success?).to be_falsey
+        expect(outcome.errors['address'].symbolic).to eq(:zombie)
       end
     end
   end

@@ -408,6 +408,15 @@ describe IpamPlugin do
         })
       end
 
+      it 'does not release address that responds to ping' do
+        allow_any_instance_of(Addresses::Release).to receive(:ping?).and_return(true)
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.100'}, expect_status: 202
+
+        expect(data).to eq({})
+
+        expect(etcd_server).not_to be_modified
+      end
+
       it 'release of gateway has no effect' do
         data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.1'}
 
