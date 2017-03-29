@@ -15,7 +15,7 @@ describe IpamPlugin do
 
     allow_any_instance_of(NodeHelper).to receive(:node).and_return('somehost')
     # Default mock to make addresses not to respond to ping
-    allow_any_instance_of(Addresses::Release).to receive(:ping?).and_return(false)
+    allow_any_instance_of(PingHelper).to receive(:ping?).and_return(false)
   end
 
   let :app do
@@ -410,9 +410,9 @@ describe IpamPlugin do
 
       it 'does not release address that responds to ping' do
         allow_any_instance_of(Addresses::Release).to receive(:ping?).and_return(true)
-        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.100'}, expect_status: 202
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.100'}, expect_status: 409
 
-        expect(data).to eq({})
+        expect(data).to eq({"Error"=>"Skip zombie address=10.80.0.100 in pool=test that still responds to ping"})
 
         expect(etcd_server).not_to be_modified
       end

@@ -117,8 +117,8 @@ class IpamPlugin < Sinatra::Application
       json({})
     rescue Mutations::ValidationException => exc
       if exc.errors['address'] && exc.errors['address'].symbolic == :zombie
-        status 202
-        json({})
+        status 409
+        json 'Error' => exc.errors['address'].message
       else
         raise exc
       end

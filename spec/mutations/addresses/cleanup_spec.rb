@@ -1,6 +1,7 @@
 describe Addresses::Cleanup do
   before do
     allow_any_instance_of(NodeHelper).to receive(:node).and_return('1')
+    allow_any_instance_of(PingHelper).to receive(:ping?).and_return(false)
   end
 
   context "for etcd with multiple reserved addresses", :etcd => true do
@@ -68,6 +69,15 @@ describe Addresses::Cleanup do
             '/kontena/ipam/addresses/test1/10.80.1.200' => { 'address' => '10.80.1.200/24', 'node' => '2' },
             '/kontena/ipam/addresses/test1/10.80.1.111' => { 'address' => '10.80.1.111/24', 'node' => '1' },
           })
+        end
+
+        it 'removes no addresses owned by this node if they respond to ping' do
+          expect(subject).to receive(:ping?).with(IPAddr.new('10.80.1.111/24')).and_return(true)
+          outcome = subject.run
+
+          expect(outcome).to be_success, outcome.errors.inspect
+
+          expect(etcd_server).not_to be_modified
         end
       end
     end

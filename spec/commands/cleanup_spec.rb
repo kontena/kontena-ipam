@@ -1,6 +1,7 @@
 describe Commands::Cleanup do
   before do
     allow_any_instance_of(NodeHelper).to receive(:node).and_return('1')
+    allow_any_instance_of(PingHelper).to receive(:ping?).and_return(false)
   end
 
   context "for etcd with multiple reserved addresses", :etcd => true do

@@ -1,9 +1,9 @@
 require 'ipaddr'
-require 'net/ping/icmp'
 
 module Addresses
   class Release < Mutations::Command
     include Logging
+    include PingHelper
 
     required do
       string :pool_id
@@ -41,13 +41,5 @@ module Addresses
       end
     end
 
-    # @param [IPAddr] ip address to ping
-    # @raise [RuntimeError] requires root privileges
-    #@return [Boolean]
-    def ping?(ip_address, timeout: 1)
-      port = 0
-      icmp = Net::Ping::ICMP.new(ip_address.to_s, port, timeout)
-      icmp.ping?
-    end
   end
 end
