@@ -14,6 +14,8 @@ describe IpamPlugin do
     IpamPlugin.policy = policy
 
     allow_any_instance_of(NodeHelper).to receive(:node).and_return('somehost')
+    # Default mock to make addresses not to respond to ping
+    allow_any_instance_of(PingHelper).to receive(:ping?).and_return(false)
   end
 
   let :app do
@@ -404,6 +406,15 @@ describe IpamPlugin do
           '/kontena/ipam/pools/test' => { 'subnet' => '10.80.0.0/24', 'gateway' => '10.80.0.1/24' },
           '/kontena/ipam/addresses/test/10.80.0.1' => { 'address' => '10.80.0.1/24' },
         })
+      end
+
+      it 'does not release address that responds to ping' do
+        allow_any_instance_of(Addresses::Release).to receive(:ping?).and_return(true)
+        data = api_post '/IpamDriver.ReleaseAddress', { 'PoolID' => 'test', 'Address' => '10.80.0.100'}, expect_status: 409
+
+        expect(data).to eq({"Error"=>"Skip zombie address=10.80.0.100 in pool=test that still responds to ping"})
+
+        expect(etcd_server).not_to be_modified
       end
 
       it 'release of gateway has no effect' do

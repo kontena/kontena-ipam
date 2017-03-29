@@ -3,6 +3,7 @@ require 'ipaddr'
 module Addresses
   class Release < Mutations::Command
     include Logging
+    include PingHelper
 
     required do
       string :pool_id
@@ -30,11 +31,15 @@ module Addresses
       elsif address.address.to_host == @pool.gateway.to_host
         info "Skip gateway address=#{address.id} in pool=#{@pool.id}"
 
+      elsif ping?(address.address)
+        message = "Skip zombie address=#{address.id} in pool=#{@pool.id} that still responds to ping"
+        warn message
+        add_error(:address, :zombie, message)
       else
         info "Delete address=#{address.id} in pool=#{@pool.id}"
-
         address.delete!
       end
     end
+
   end
 end

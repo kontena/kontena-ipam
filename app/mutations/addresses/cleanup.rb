@@ -2,6 +2,7 @@ module Addresses
   class Cleanup < Mutations::Command
     include Logging
     include NodeHelper
+    include PingHelper
 
     # Prepare for cleanup by retriving the parameters needed for a future cleanup
     #
@@ -54,6 +55,9 @@ module Addresses
 
         elsif address.etcd_modified?(after_index: self.etcd_index_upto)
           debug "...recently allocated, skipping"
+
+        elsif ping?(address.address)
+          warn "Skip zombie address=#{address.id} in pool=#{@pool.id} that still responds to ping"
 
         else
           warn "Cleanup unused address #{address.address.to_host}"

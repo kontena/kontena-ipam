@@ -108,12 +108,21 @@ class IpamPlugin < Sinatra::Application
   end
 
   post '/IpamDriver.ReleaseAddress' do
-    Addresses::Release.run!(
-      pool_id: params['PoolID'],
-      address: params['Address']
-    )
+    begin
+      Addresses::Release.run!(
+        pool_id: params['PoolID'],
+        address: params['Address']
+      )
 
-    json({})
+      json({})
+    rescue Mutations::ValidationException => exc
+      if exc.errors['address'] && exc.errors['address'].symbolic == :zombie
+        status 409
+        json 'Error' => exc.errors['address'].message
+      else
+        raise exc
+      end
+    end
   end
 
   post '/IpamDriver.ReleasePool' do
